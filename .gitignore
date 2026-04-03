@@ -10,6 +10,8 @@ ChessBackend/*.db-wal
 ChessFrontend/node_modules/
 ChessFrontend/dist/
 ChessFrontend/.vite/
+node_modules/
+pnpm-lock.yaml
 
 # Environment
 .env
