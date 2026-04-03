@@ -1,0 +1,41 @@
+# Backend
+ChessBackend/bin/
+ChessBackend/obj/
+ChessBackend/*.db
+ChessBackend/*.db-shm
+ChessBackend/*.db-wal
+.nuget-packages/
+
+# Frontend
+ChessFrontend/node_modules/
+ChessFrontend/dist/
+ChessFrontend/.vite/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary markdown files
+RESTART_*.md
+ROLLBACK_*.md
+FINAL_FIX.md
+FIX_SYNC_ISSUE.md
+QUICK_START.md
+CHANGELOG.md
+UPDATES.md
+RECONNECT_FEATURE.md
+RESTART_INSTRUCTIONS.md
