@@ -46,7 +46,7 @@ class SignalRService {
     this.gameId = null;
   }
 
-  async makeMove(gameId, san) {
+  async makeMove(gameId, san, whiteTimeLeft, blackTimeLeft) {
     if (!this.connection) {
       console.error('SignalR: No connection object');
       throw new Error('Not connected');
@@ -57,10 +57,10 @@ class SignalRService {
       throw new Error(`SignalR not connected. State: ${this.connection.state}`);
     }
 
-    console.log('SignalR makeMove:', { gameId, san });
+    console.log('SignalR makeMove:', { gameId, san, whiteTimeLeft, blackTimeLeft });
     
     try {
-      await this.connection.invoke('MakeMove', gameId, san);
+      await this.connection.invoke('MakeMove', gameId, san, whiteTimeLeft, blackTimeLeft);
       console.log('SignalR makeMove sent successfully');
     } catch (error) {
       console.error('SignalR makeMove error:', error);

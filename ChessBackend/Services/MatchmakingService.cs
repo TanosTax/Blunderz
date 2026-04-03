@@ -69,12 +69,25 @@ public class MatchmakingService : IMatchmakingService
         var random = new Random();
         var isWhite = random.Next(2) == 0;
 
+        // Parse time control (format: "10+0" means 10 minutes + 0 increment)
+        var timeInSeconds = 600; // default 10 minutes
+        if (!string.IsNullOrEmpty(timeControl))
+        {
+            var parts = timeControl.Split('+');
+            if (parts.Length > 0 && int.TryParse(parts[0], out var minutes))
+            {
+                timeInSeconds = minutes * 60;
+            }
+        }
+
         var game = new Game
         {
             WhitePlayerId = isWhite ? userId : opponent.UserId,
             BlackPlayerId = isWhite ? opponent.UserId : userId,
             TimeControl = timeControl,
             Status = GameStatus.Active,
+            WhiteTimeLeft = timeInSeconds,
+            BlackTimeLeft = timeInSeconds,
             CreatedAt = DateTime.UtcNow
         };
 

@@ -40,6 +40,10 @@ public class Game
     
     public int? WinnerId { get; set; }
     
+    // Time tracking (in seconds)
+    public int WhiteTimeLeft { get; set; } = 600; // 10 minutes default
+    public int BlackTimeLeft { get; set; } = 600;
+    
     // Disconnect tracking
     public DateTime? WhitePlayerLastSeen { get; set; }
     public DateTime? BlackPlayerLastSeen { get; set; }

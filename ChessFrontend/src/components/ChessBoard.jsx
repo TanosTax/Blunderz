@@ -73,11 +73,9 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
         const data = await apiService.getGame(gameId);
         setGameData(data);
         
-        // Parse time control (e.g., "10+0" means 10 minutes + 0 increment)
-        const [minutes] = data.timeControl.split('+').map(Number);
-        const seconds = minutes * 60;
-        setWhiteTime(seconds);
-        setBlackTime(seconds);
+        // Use actual time left from database
+        setWhiteTime(data.whiteTimeLeft || 600);
+        setBlackTime(data.blackTimeLeft || 600);
       } catch (error) {
         console.error('Failed to load game data:', error);
       }

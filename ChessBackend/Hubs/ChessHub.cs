@@ -144,6 +144,10 @@ public class ChessHub : Hub
             var moveNumber = game.Moves.Count + 1;
             _logger.LogInformation($"Creating move #{moveNumber}");
             
+            // Update time in database
+            game.WhiteTimeLeft = whiteTimeLeft;
+            game.BlackTimeLeft = blackTimeLeft;
+            
             var move = new Move
             {
                 GameId = gameGuid,
