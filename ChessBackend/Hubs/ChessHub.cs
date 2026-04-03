@@ -21,7 +21,194 @@ public class ChessHub : Hub
     {
         await Groups.AddToGroupAsync(Context.ConnectionId, gameId);
         _logger.LogInformation($"Connection {Context.ConnectionId} joined game {gameId}");
+        
+        // Initialize LastSeen when player joins
+        if (Guid.TryParse(gameId, out var gameGuid))
+        {
+            var game = await _context.Games.FindAsync(gameGuid);
+            if (game != null && game.Status == GameStatus.Active)
+            {
+                var now = DateTime.UtcNow;
+                
+                // Initialize LastSeen for both players if not set
+                if (!game.WhitePlayerLastSeen.HasValue)
+                {
+                    game.WhitePlayerLastSeen = now;
+                    game.WhitePlayerConnected = true;
+                }
+                if (!game.BlackPlayerLastSeen.HasValue)
+                {
+                    game.BlackPlayerLastSeen = now;
+                    game.BlackPlayerConnected = true;
+                }
+                
+                await _context.SaveChangesAsync();
+            }
+        }
     }
+
+    public async Task Heartbeat(string gameId, int playerId)
+    {
+        if (!Guid.TryParse(gameId, out var gameGuid))
+        {
+            return;
+        }
+
+        var game = await _context.Games.FindAsync(gameGuid);
+        if (game != null && game.Status == GameStatus.Active)
+        {
+            var now = DateTime.UtcNow;
+
+            if (game.WhitePlayerId == playerId)
+            {
+                game.WhitePlayerConnected = true;
+                game.WhitePlayerLastSeen = now;
+            }
+            else if (game.BlackPlayerId == playerId)
+            {
+                game.BlackPlayerConnected = true;
+                game.BlackPlayerLastSeen = now;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+    }
+
+
+
+    public async Task ClaimVictory(string gameId, int winnerId)
+    {
+        if (!Guid.TryParse(gameId, out var gameGuid))
+        {
+            await Clients.Caller.SendAsync("Error", "Invalid game ID");
+            return;
+        }
+
+        var game = await _context.Games
+            .Include(g => g.WhitePlayer)
+            .Include(g => g.BlackPlayer)
+            .FirstOrDefaultAsync(g => g.Id == gameGuid);
+
+        if (game == null)
+        {
+            await Clients.Caller.SendAsync("Error", "Game not found");
+            return;
+        }
+
+        if (game.Status != GameStatus.Active)
+        {
+            await Clients.Caller.SendAsync("Error", "Game is not active");
+            return;
+        }
+
+        game.Status = GameStatus.Completed;
+        game.Result = GameResult.Timeout;
+        game.WinnerId = winnerId;
+        game.CompletedAt = DateTime.UtcNow;
+
+        var winner = winnerId == game.WhitePlayerId ? game.WhitePlayer : game.BlackPlayer;
+        var loser = winnerId == game.WhitePlayerId ? game.BlackPlayer : game.WhitePlayer;
+
+        // Update stats
+        winner.GamesPlayed++;
+        winner.Wins++;
+        loser.GamesPlayed++;
+        loser.Losses++;
+
+        // Calculate Elo changes
+        var oldWinnerElo = winner.Elo;
+        var oldLoserElo = loser.Elo;
+        
+        var eloResult = winnerId == game.WhitePlayerId 
+            ? Interfaces.GameResult.WhiteWin 
+            : Interfaces.GameResult.BlackWin;
+        
+        var eloCalculator = Context.GetHttpContext()?.RequestServices.GetRequiredService<Interfaces.IEloCalculatorService>();
+        if (eloCalculator != null)
+        {
+            var (newWhiteElo, newBlackElo) = eloCalculator.CalculateNewRatings(
+                game.WhitePlayer.Elo, 
+                game.BlackPlayer.Elo, 
+                eloResult);
+            
+            game.WhitePlayer.Elo = newWhiteElo;
+            game.BlackPlayer.Elo = newBlackElo;
+        }
+
+        await _context.SaveChangesAsync();
+
+        var winnerEloChange = winner.Elo - oldWinnerElo;
+        var loserEloChange = loser.Elo - oldLoserElo;
+
+        await Clients.Group(gameId).SendAsync("GameEnded", new
+        {
+            result = "timeout",
+            winnerId,
+            message = "Victory claimed due to opponent disconnect",
+            eloChanges = new
+            {
+                whitePlayerId = game.WhitePlayerId,
+                whiteChange = game.WhitePlayerId == winnerId ? winnerEloChange : loserEloChange,
+                blackPlayerId = game.BlackPlayerId,
+                blackChange = game.BlackPlayerId == winnerId ? winnerEloChange : loserEloChange
+            }
+        });
+
+        _logger.LogInformation($"Player {winnerId} claimed victory in game {gameId}");
+    }
+
+    public async Task OfferDrawAfterDisconnect(string gameId)
+    {
+        if (!Guid.TryParse(gameId, out var gameGuid))
+        {
+            await Clients.Caller.SendAsync("Error", "Invalid game ID");
+            return;
+        }
+
+        var game = await _context.Games
+            .Include(g => g.WhitePlayer)
+            .Include(g => g.BlackPlayer)
+            .FirstOrDefaultAsync(g => g.Id == gameGuid);
+
+        if (game == null)
+        {
+            await Clients.Caller.SendAsync("Error", "Game not found");
+            return;
+        }
+
+        if (game.Status != GameStatus.Active)
+        {
+            await Clients.Caller.SendAsync("Error", "Game is not active");
+            return;
+        }
+
+        game.Status = GameStatus.Completed;
+        game.Result = GameResult.Draw;
+        game.CompletedAt = DateTime.UtcNow;
+
+        game.WhitePlayer.GamesPlayed++;
+        game.WhitePlayer.Draws++;
+        game.BlackPlayer.GamesPlayed++;
+        game.BlackPlayer.Draws++;
+
+        await _context.SaveChangesAsync();
+
+        await Clients.Group(gameId).SendAsync("GameEnded", new
+        {
+            result = "draw",
+            message = "Draw agreed after opponent disconnect",
+            eloChanges = new
+            {
+                whitePlayerId = game.WhitePlayerId,
+                whiteChange = 0,
+                blackPlayerId = game.BlackPlayerId,
+                blackChange = 0
+            }
+        });
+
+        _logger.LogInformation($"Draw offered after disconnect in game {gameId}");
+    }
+
 
     public async Task LeaveGame(string gameId)
     {
@@ -95,6 +282,7 @@ public class ChessHub : Hub
 
     public async Task MakeMove(string gameId, string san, int whiteTimeLeft, int blackTimeLeft)
     {
+        _logger.LogInformation($"=== MakeMove START === gameId={gameId}, san={san}, whiteTime={whiteTimeLeft}, blackTime={blackTimeLeft}");
         try
         {
             _logger.LogInformation($"MakeMove called: gameId={gameId}, san={san}, whiteTime={whiteTimeLeft}, blackTime={blackTimeLeft}");

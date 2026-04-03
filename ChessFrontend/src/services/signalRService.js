@@ -46,6 +46,26 @@ class SignalRService {
     this.gameId = null;
   }
 
+  async registerConnection(gameId, playerId) {
+    // Removed - not needed
+  }
+
+  async claimVictory(gameId, winnerId) {
+    if (!this.connection || this.connection.state !== 'Connected') {
+      throw new Error('Not connected to SignalR');
+    }
+
+    await this.connection.invoke('ClaimVictory', gameId, winnerId);
+  }
+
+  async offerDrawAfterDisconnect(gameId) {
+    if (!this.connection || this.connection.state !== 'Connected') {
+      throw new Error('Not connected to SignalR');
+    }
+
+    await this.connection.invoke('OfferDrawAfterDisconnect', gameId);
+  }
+
   async makeMove(gameId, san, whiteTimeLeft, blackTimeLeft) {
     if (!this.connection) {
       console.error('SignalR: No connection object');
@@ -68,6 +88,18 @@ class SignalRService {
     }
   }
 
+  async sendHeartbeat(gameId, playerId) {
+    if (!this.connection || this.connection.state !== 'Connected') {
+      return;
+    }
+
+    try {
+      await this.connection.invoke('Heartbeat', gameId, playerId);
+    } catch (error) {
+      console.error('Heartbeat error:', error);
+    }
+  }
+
   onMoveMade(callback) {
     if (!this.connection) {
       return;
@@ -82,6 +114,38 @@ class SignalRService {
     }
 
     this.connection.on('Error', callback);
+  }
+
+  onPlayerConnected(callback) {
+    if (!this.connection) {
+      return;
+    }
+
+    this.connection.on('PlayerConnected', callback);
+  }
+
+  onPlayerDisconnected(callback) {
+    if (!this.connection) {
+      return;
+    }
+
+    this.connection.on('PlayerDisconnected', callback);
+  }
+
+  onOpponentDisconnectedTimeout(callback) {
+    if (!this.connection) {
+      return;
+    }
+
+    this.connection.on('OpponentDisconnectedTimeout', callback);
+  }
+
+  onGameEnded(callback) {
+    if (!this.connection) {
+      return;
+    }
+
+    this.connection.on('GameEnded', callback);
   }
 
   async disconnect() {

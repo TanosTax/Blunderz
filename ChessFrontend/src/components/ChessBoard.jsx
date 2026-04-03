@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Chessground } from 'chessground';
 import { Chess } from 'chess.js';
 import { useChess } from '../hooks/useChess';
@@ -13,6 +13,7 @@ import '../styles/chessboard-themes.css';
 export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange }) {
   const navigate = useNavigate();
   const [showGameOverModal, setShowGameOverModal] = useState(false);
+  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [gameData, setGameData] = useState(null);
   const [whiteTime, setWhiteTime] = useState(600); // 10 minutes in seconds
@@ -49,10 +50,24 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
     makeMove,
     isCheck,
     isCheckmate,
-    isDraw
-  } = useChess(gameId, userId, isPlayerWhite, whiteTimeRef, blackTimeRef, setWhiteTime, setBlackTime);
+    isDraw,
+    moveCount,
+    opponentConnected,
+    opponentDisconnectTime,
+    canClaimVictory,
+    claimVictory,
+    offerDrawAfterDisconnect
+  } = useChess(
+    gameId, 
+    userId, 
+    isPlayerWhite, 
+    setWhiteTime, 
+    setBlackTime,
+    whiteTimeRef,
+    blackTimeRef
+  );
   
-  const [timeUntilWin, setTimeUntilWin] = useState(null);
+
 
   const boardRef = useRef(null);
   const cgRef = useRef(null);
@@ -66,16 +81,12 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
 
   console.log('ChessBoard render:', { isMyTurn, gameOver, isPlayerWhite });
   
-  // Load game data
+  // Load game data (but don't set time - useChess handles that)
   useEffect(() => {
     const loadGameData = async () => {
       try {
         const data = await apiService.getGame(gameId);
         setGameData(data);
-        
-        // Use actual time left from database
-        setWhiteTime(data.whiteTimeLeft || 600);
-        setBlackTime(data.blackTimeLeft || 600);
       } catch (error) {
         console.error('Failed to load game data:', error);
       }
@@ -94,13 +105,28 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
       return;
     }
     
+    // Don't start timer until first move is made
+    if (moveCount === 0) {
+      return;
+    }
+    
     timerIntervalRef.current = setInterval(() => {
-      // Check whose turn it is using ref (always up to date)
-      if (isMyTurnRef.current) {
+      // Decrease time for whoever's turn it is
+      const currentTurn = isMyTurnRef.current;
+      
+      if (currentTurn) {
+        // My turn - decrease my time
         if (isPlayerWhite) {
           setWhiteTime(prev => Math.max(0, prev - 1));
         } else {
           setBlackTime(prev => Math.max(0, prev - 1));
+        }
+      } else {
+        // Opponent's turn - decrease opponent's time
+        if (isPlayerWhite) {
+          setBlackTime(prev => Math.max(0, prev - 1));
+        } else {
+          setWhiteTime(prev => Math.max(0, prev - 1));
         }
       }
     }, 1000);
@@ -110,7 +136,7 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
         clearInterval(timerIntervalRef.current);
       }
     };
-  }, [gameOver, isPlayerWhite]);
+  }, [gameOver, isPlayerWhite, moveCount]);
   
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -228,8 +254,8 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
     if (isCheckmate) {
       const didIWin = (winner === 'white' && isPlayerWhite) || (winner === 'black' && !isPlayerWhite);
       return {
-        title: didIWin ? '🎉 Victory!' : '😔 Defeat',
-        subtitle: `Checkmate! ${winner === 'white' ? 'White' : 'Black'} wins!`,
+        title: didIWin ? '🎉 Victory' : '😔 Defeat',
+        subtitle: `Checkmate! ${winner === 'white' ? 'White' : 'Black'} wins`,
         color: didIWin ? '#4CAF50' : '#f44336'
       };
     }
@@ -247,6 +273,23 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
     };
   };
 
+  // Show disconnect modal when can claim victory
+  useEffect(() => {
+    if (canClaimVictory && !gameOver) {
+      setShowDisconnectModal(true);
+    }
+  }, [canClaimVictory, gameOver]);
+
+  const handleClaimVictory = async () => {
+    await claimVictory();
+    setShowDisconnectModal(false);
+  };
+
+  const handleOfferDraw = async () => {
+    await offerDrawAfterDisconnect();
+    setShowDisconnectModal(false);
+  };
+
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
       {/* Settings Modal */}
@@ -257,6 +300,89 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
           onClose={() => setShowSettings(false)}
         />
       )}
+
+      {/* Disconnect Modal */}
+      {showDisconnectModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+            borderRadius: '12px',
+            padding: '40px',
+            maxWidth: '400px',
+            width: '90%',
+            textAlign: 'center',
+            boxShadow: '0 0 30px rgba(212, 175, 55, 0.3)',
+            border: '2px solid #d4af37'
+          }}>
+            <div style={{ fontSize: '48px', marginBottom: '20px' }}>⚠️</div>
+            <h2 style={{ marginBottom: '10px', fontSize: '24px', color: '#d4af37' }}>Opponent Disconnected</h2>
+            <p style={{ color: '#aaa', fontSize: '16px', marginBottom: '30px' }}>
+              Your opponent has been disconnected for 2 minutes. You can claim victory or offer a draw.
+            </p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <button
+                onClick={handleClaimVictory}
+                style={{
+                  padding: '15px 30px',
+                  fontSize: '16px',
+                  background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                🏆 Claim Victory
+              </button>
+              
+              <button
+                onClick={handleOfferDraw}
+                style={{
+                  padding: '15px 30px',
+                  fontSize: '16px',
+                  background: 'linear-gradient(135deg, #FF9800 0%, #f57c00 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                🤝 Offer Draw
+              </button>
+              
+              <button
+                onClick={() => setShowDisconnectModal(false)}
+                style={{
+                  padding: '12px 30px',
+                  fontSize: '14px',
+                  backgroundColor: 'transparent',
+                  color: '#888',
+                  border: '1px solid #444',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}
+              >
+                Wait
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Game Over Modal */}
       {showGameOverModal && (
         <div style={{
@@ -265,20 +391,21 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          backgroundColor: 'rgba(0, 0, 0, 0.85)',
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
           zIndex: 1000
         }}>
           <div style={{
-            backgroundColor: 'white',
+            background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
             borderRadius: '12px',
             padding: '40px',
             maxWidth: '400px',
             width: '90%',
             textAlign: 'center',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
+            boxShadow: '0 0 30px rgba(212, 175, 55, 0.3)',
+            border: '2px solid #d4af37'
           }}>
             <div style={{
               fontSize: '64px',
@@ -287,14 +414,14 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
               {getGameResultText().title.split(' ')[0]}
             </div>
             <h2 style={{
-              color: getGameResultText().color,
+              color: '#d4af37',
               marginBottom: '10px',
               fontSize: '28px'
             }}>
               {getGameResultText().title.split(' ').slice(1).join(' ') || getGameResultText().title}
             </h2>
             <p style={{
-              color: '#666',
+              color: '#aaa',
               fontSize: '18px',
               marginBottom: '30px'
             }}>
@@ -304,13 +431,16 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
             {eloChange !== null && (
               <div style={{
                 padding: '15px',
-                backgroundColor: eloChange > 0 ? '#E8F5E9' : '#FFEBEE',
+                background: eloChange > 0 
+                  ? 'linear-gradient(135deg, rgba(76, 175, 80, 0.2) 0%, rgba(69, 160, 73, 0.2) 100%)' 
+                  : 'linear-gradient(135deg, rgba(244, 67, 54, 0.2) 0%, rgba(211, 47, 47, 0.2) 100%)',
                 borderRadius: '8px',
-                marginBottom: '20px'
+                marginBottom: '20px',
+                border: eloChange > 0 ? '1px solid #4CAF50' : '1px solid #f44336'
               }}>
                 <div style={{
                   fontSize: '14px',
-                  color: '#666',
+                  color: '#aaa',
                   marginBottom: '5px'
                 }}>
                   Rating Change
@@ -335,7 +465,7 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
                 style={{
                   padding: '15px 30px',
                   fontSize: '16px',
-                  backgroundColor: '#4CAF50',
+                  background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
@@ -351,8 +481,8 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
                 style={{
                   padding: '15px 30px',
                   fontSize: '16px',
-                  backgroundColor: '#2196F3',
-                  color: 'white',
+                  background: 'linear-gradient(135deg, #d4af37 0%, #c9a532 100%)',
+                  color: '#1a1a1a',
                   border: 'none',
                   borderRadius: '8px',
                   cursor: 'pointer',
@@ -368,8 +498,8 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
                   padding: '12px 30px',
                   fontSize: '14px',
                   backgroundColor: 'transparent',
-                  color: '#666',
-                  border: '1px solid #ccc',
+                  color: '#888',
+                  border: '1px solid #444',
                   borderRadius: '8px',
                   cursor: 'pointer'
                 }}
@@ -405,16 +535,31 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
           ) : (
             <div>
               {isCheck && <div style={{ color: 'red', fontWeight: 'bold' }}>⚠️ Check!</div>}
-              <div style={{ 
-                padding: '8px 16px',
-                backgroundColor: isMyTurn ? '#4CAF50' : '#FF9800',
-                color: 'white',
-                borderRadius: '20px',
-                display: 'inline-block',
-                marginTop: '8px'
-              }}>
-                {isMyTurn ? "🎯 Your turn" : "⏳ Opponent's turn"}
-              </div>
+              {moveCount === 0 ? (
+                <div style={{ 
+                  padding: '12px 20px',
+                  backgroundColor: '#2196F3',
+                  color: 'white',
+                  borderRadius: '20px',
+                  display: 'inline-block',
+                  marginTop: '8px',
+                  fontSize: '16px',
+                  fontWeight: 'bold'
+                }}>
+                  ⏸️ Waiting for first move to start timer
+                </div>
+              ) : (
+                <div style={{ 
+                  padding: '8px 16px',
+                  backgroundColor: isMyTurn ? '#4CAF50' : '#FF9800',
+                  color: 'white',
+                  borderRadius: '20px',
+                  display: 'inline-block',
+                  marginTop: '8px'
+                }}>
+                  {isMyTurn ? "🎯 Your turn" : "⏳ Opponent's turn"}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -443,8 +588,19 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
             marginBottom: '12px',
             color: '#d4af37',
             textTransform: 'uppercase',
-            letterSpacing: '1px'
+            letterSpacing: '1px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
           }}>
+            <span style={{
+              width: '12px',
+              height: '12px',
+              borderRadius: '50%',
+              backgroundColor: opponentConnected ? '#4CAF50' : '#888',
+              boxShadow: opponentConnected ? '0 0 8px #4CAF50' : 'none',
+              transition: 'all 0.3s ease'
+            }}></span>
             {getOpponentName()}
           </div>
           <div style={{ 
@@ -474,8 +630,19 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
             marginBottom: '12px',
             color: '#d4af37',
             textTransform: 'uppercase',
-            letterSpacing: '1px'
+            letterSpacing: '1px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
           }}>
+            <span style={{
+              width: '12px',
+              height: '12px',
+              borderRadius: '50%',
+              backgroundColor: '#4CAF50',
+              boxShadow: '0 0 8px #4CAF50',
+              transition: 'all 0.3s ease'
+            }}></span>
             {getMyName()} <span style={{ color: '#888', fontSize: '14px' }}>(YOU)</span>
           </div>
           <div style={{ 
