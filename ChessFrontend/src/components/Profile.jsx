@@ -1,10 +1,35 @@
 import { useState, useEffect } from 'react';
+import { 
+  Box, 
+  Card, 
+  CardContent, 
+  Typography, 
+  Grid, 
+  Chip,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  IconButton,
+  Divider,
+  CircularProgress
+} from '@mui/material';
+import { 
+  EmojiEvents as TrophyIcon,
+  Close as CloseIcon,
+  SportsEsports as GameIcon
+} from '@mui/icons-material';
 import apiService from '../services/apiService';
 
 export default function Profile({ userId }) {
   const [user, setUser] = useState(null);
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedGame, setSelectedGame] = useState(null);
+  const [gameDetailsOpen, setGameDetailsOpen] = useState(false);
 
   useEffect(() => {
     loadUserData();
@@ -26,146 +51,325 @@ export default function Profile({ userId }) {
     }
   };
 
+  const handleGameClick = async (game) => {
+    try {
+      const fullGame = await apiService.getGame(game.id);
+      setSelectedGame(fullGame);
+      setGameDetailsOpen(true);
+    } catch (error) {
+      console.error('Failed to load game details:', error);
+    }
+  };
+
+  const handleCloseDetails = () => {
+    setGameDetailsOpen(false);
+    setSelectedGame(null);
+  };
+
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
   }
 
   if (!user) {
-    return <div style={{ textAlign: 'center', padding: '50px' }}>User not found</div>;
+    return (
+      <Box textAlign="center" py={6}>
+        <Typography variant="h6" color="text.secondary">
+          User not found
+        </Typography>
+      </Box>
+    );
   }
 
   const winRate = user.gamesPlayed > 0 
     ? ((user.wins / user.gamesPlayed) * 100).toFixed(1) 
     : 0;
 
+  const completedGames = games.filter(g => g.status === 2);
+
   return (
-    <div style={{ maxWidth: '800px', margin: '20px auto', padding: '20px' }}>
-      <div style={{ 
-        border: '1px solid #ccc', 
-        borderRadius: '8px', 
-        padding: '30px',
-        marginBottom: '30px'
-      }}>
-        <h2>{user.username}</h2>
-        
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-          gap: '20px',
-          marginTop: '20px'
-        }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#4CAF50' }}>
-              {user.elo}
-            </div>
-            <div style={{ color: '#666' }}>Rating</div>
-          </div>
+    <Box maxWidth="900px" margin="0 auto" p={3}>
+      {/* User Stats Card */}
+      <Card elevation={3} sx={{ mb: 4 }}>
+        <CardContent sx={{ p: 4 }}>
+          <Box display="flex" alignItems="center" mb={3}>
+            <TrophyIcon sx={{ fontSize: 40, color: 'primary.main', mr: 2 }} />
+            <Typography variant="h4" component="h1">
+              {user.username}
+            </Typography>
+          </Box>
 
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '32px', fontWeight: 'bold' }}>
-              {user.gamesPlayed}
-            </div>
-            <div style={{ color: '#666' }}>Games</div>
-          </div>
+          <Grid container spacing={3}>
+            <Grid item xs={6} sm={4} md={2}>
+              <Box textAlign="center">
+                <Typography variant="h3" color="primary" fontWeight="bold">
+                  {user.elo}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Rating
+                </Typography>
+              </Box>
+            </Grid>
 
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#2196F3' }}>
-              {user.wins}
-            </div>
-            <div style={{ color: '#666' }}>Wins</div>
-          </div>
+            <Grid item xs={6} sm={4} md={2}>
+              <Box textAlign="center">
+                <Typography variant="h3" fontWeight="bold">
+                  {user.gamesPlayed}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Games
+                </Typography>
+              </Box>
+            </Grid>
 
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#f44336' }}>
-              {user.losses}
-            </div>
-            <div style={{ color: '#666' }}>Losses</div>
-          </div>
+            <Grid item xs={6} sm={4} md={2}>
+              <Box textAlign="center">
+                <Typography variant="h3" color="success.main" fontWeight="bold">
+                  {user.wins}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Wins
+                </Typography>
+              </Box>
+            </Grid>
 
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#FF9800' }}>
-              {user.draws}
-            </div>
-            <div style={{ color: '#666' }}>Draws</div>
-          </div>
+            <Grid item xs={6} sm={4} md={2}>
+              <Box textAlign="center">
+                <Typography variant="h3" color="error.main" fontWeight="bold">
+                  {user.losses}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Losses
+                </Typography>
+              </Box>
+            </Grid>
 
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '32px', fontWeight: 'bold' }}>
-              {winRate}%
-            </div>
-            <div style={{ color: '#666' }}>Win Rate</div>
-          </div>
-        </div>
-      </div>
+            <Grid item xs={6} sm={4} md={2}>
+              <Box textAlign="center">
+                <Typography variant="h3" color="warning.main" fontWeight="bold">
+                  {user.draws}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Draws
+                </Typography>
+              </Box>
+            </Grid>
 
-      <div>
-        <h3>Recent Games</h3>
-        {games.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '30px', color: '#666' }}>
-            No games played yet
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {games.slice(0, 10).map((game) => {
-              const isWhite = game.whitePlayerId === userId;
-              const opponent = isWhite ? game.blackPlayer : game.whitePlayer;
-              
-              let resultText = 'In Progress';
-              let resultColor = '#666';
-              
-              // GameStatus: 0 = Pending, 1 = Active, 2 = Completed
-              if (game.status === 2) {
+            <Grid item xs={6} sm={4} md={2}>
+              <Box textAlign="center">
+                <Typography variant="h3" fontWeight="bold">
+                  {winRate}%
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Win Rate
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* Games History */}
+      <Card elevation={3}>
+        <CardContent>
+          <Box display="flex" alignItems="center" mb={2}>
+            <GameIcon sx={{ mr: 1, color: 'text.secondary' }} />
+            <Typography variant="h5" component="h2">
+              Game History
+            </Typography>
+          </Box>
+
+          {completedGames.length === 0 ? (
+            <Box textAlign="center" py={4}>
+              <Typography variant="body1" color="text.secondary">
+                No completed games yet
+              </Typography>
+            </Box>
+          ) : (
+            <List sx={{ p: 0 }}>
+              {completedGames.map((game, index) => {
+                const isWhite = game.whitePlayerId === userId;
+                const opponent = isWhite ? game.blackPlayer : game.whitePlayer;
+                
+                let resultText = 'Draw';
+                let resultColor = 'warning';
+                
                 if (game.winnerId === userId) {
                   resultText = 'Win';
-                  resultColor = '#4CAF50';
-                } else if (game.winnerId === null) {
-                  resultText = 'Draw';
-                  resultColor = '#FF9800';
-                } else {
+                  resultColor = 'success';
+                } else if (game.winnerId !== null) {
                   resultText = 'Loss';
-                  resultColor = '#f44336';
+                  resultColor = 'error';
                 }
-              } else if (game.status === 1) {
-                resultText = 'Active';
-                resultColor = '#2196F3';
-              } else if (game.status === 0) {
-                resultText = 'Pending';
-                resultColor = '#9E9E9E';
-              }
 
-              return (
-                <div 
-                  key={game.id}
-                  style={{
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    padding: '15px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 'bold' }}>
-                      vs {opponent?.username || 'Unknown'}
-                    </div>
-                    <div style={{ fontSize: '14px', color: '#666' }}>
-                      {isWhite ? 'White' : 'Black'} • {game.timeControl}
-                    </div>
-                  </div>
-                  <div style={{ 
-                    fontWeight: 'bold', 
-                    fontSize: '18px',
-                    color: resultColor 
-                  }}>
-                    {resultText}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
+                const gameDate = new Date(game.completedAt || game.createdAt);
+                const dateStr = gameDate.toLocaleDateString('ru-RU', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric'
+                });
+
+                return (
+                  <Box key={game.id}>
+                    {index > 0 && <Divider />}
+                    <ListItem disablePadding>
+                      <ListItemButton onClick={() => handleGameClick(game)}>
+                        <ListItemText
+                          primary={
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Typography variant="body1" fontWeight="500">
+                                vs {opponent?.username || 'Unknown'}
+                              </Typography>
+                              <Chip 
+                                label={resultText} 
+                                color={resultColor}
+                                size="small"
+                              />
+                            </Box>
+                          }
+                          secondary={
+                            <Box display="flex" gap={2} mt={0.5}>
+                              <Typography variant="body2" color="text.secondary">
+                                {isWhite ? '⚪ White' : '⚫ Black'}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {game.timeControl}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {dateStr}
+                              </Typography>
+                            </Box>
+                          }
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  </Box>
+                );
+              })}
+            </List>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Game Details Dialog */}
+      <Dialog 
+        open={gameDetailsOpen} 
+        onClose={handleCloseDetails}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">Game Details</Typography>
+            <IconButton onClick={handleCloseDetails} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {selectedGame && (
+            <Box>
+              <Grid container spacing={2} mb={3}>
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    White
+                  </Typography>
+                  <Typography variant="body1" fontWeight="500">
+                    {selectedGame.whitePlayer?.username}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {selectedGame.whitePlayer?.elo} rating
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Black
+                  </Typography>
+                  <Typography variant="body1" fontWeight="500">
+                    {selectedGame.blackPlayer?.username}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {selectedGame.blackPlayer?.elo} rating
+                  </Typography>
+                </Grid>
+              </Grid>
+
+              <Divider sx={{ my: 2 }} />
+
+              <Box mb={2}>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  Result
+                </Typography>
+                <Typography variant="body1">
+                  {selectedGame.result === 0 && '1-0 (White wins)'}
+                  {selectedGame.result === 1 && '0-1 (Black wins)'}
+                  {selectedGame.result === 2 && '½-½ (Draw)'}
+                  {selectedGame.result === 3 && '½-½ (Stalemate)'}
+                  {selectedGame.result === 4 && 'Timeout'}
+                  {selectedGame.result === 5 && 'Resignation'}
+                </Typography>
+              </Box>
+
+              <Box mb={2}>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  Time Control
+                </Typography>
+                <Typography variant="body1">
+                  {selectedGame.timeControl}
+                </Typography>
+              </Box>
+
+              <Box mb={2}>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  Moves
+                </Typography>
+                <Typography variant="body1">
+                  {selectedGame.moves?.length || 0} moves
+                </Typography>
+              </Box>
+
+              {selectedGame.moves && selectedGame.moves.length > 0 && (
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Move History
+                  </Typography>
+                  <Box 
+                    sx={{ 
+                      maxHeight: '200px', 
+                      overflowY: 'auto',
+                      bgcolor: 'grey.50',
+                      p: 2,
+                      borderRadius: 1
+                    }}
+                  >
+                    <Typography variant="body2" component="pre" sx={{ fontFamily: 'monospace', m: 0 }}>
+                      {selectedGame.moves
+                        .reduce((acc, move, idx) => {
+                          if (idx % 2 === 0) {
+                            acc.push(`${Math.floor(idx / 2) + 1}. ${move.san}`);
+                          } else {
+                            acc[acc.length - 1] += ` ${move.san}`;
+                          }
+                          return acc;
+                        }, [])
+                        .join('\n')}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+
+              <Box mt={2}>
+                <Typography variant="caption" color="text.secondary">
+                  Game ID: {selectedGame.id}
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
+    </Box>
   );
 }
