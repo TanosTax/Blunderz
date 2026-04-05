@@ -6,6 +6,10 @@ ChessBackend/*.db-shm
 ChessBackend/*.db-wal
 .nuget-packages/
 
+# Tests
+ChessBackend.Tests/bin/
+ChessBackend.Tests/obj/
+
 # Frontend
 ChessFrontend/node_modules/
 ChessFrontend/dist/
