@@ -3,6 +3,7 @@ namespace ChessBackend.Interfaces;
 public interface IEloCalculatorService
 {
     (int newWhiteElo, int newBlackElo) CalculateNewRatings(int whiteElo, int blackElo, GameResult result);
+    (int newWhiteElo, int newBlackElo) CalculateNewRatings(int whiteElo, int blackElo, GameResult result, bool whitePlayerBerserk, bool blackPlayerBerserk);
     int GetKFactor(int gamesPlayed, int currentElo);
 }
 

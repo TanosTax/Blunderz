@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Chess } from 'chess.js';
 import signalRService from '../services/signalRService';
 import apiService from '../services/apiService';
+import soundService from '../services/soundService';
 
 export const useChess = (gameId, userId, isPlayerWhite, setWhiteTime, setBlackTime, whiteTimeRef, blackTimeRef) => {
   const [game] = useState(new Chess());
@@ -12,9 +13,12 @@ export const useChess = (gameId, userId, isPlayerWhite, setWhiteTime, setBlackTi
   const [gameOver, setGameOver] = useState(false);
   const [winner, setWinner] = useState(null);
   const [eloChange, setEloChange] = useState(null);
+  const [gameEndReason, setGameEndReason] = useState(null); // 'checkmate', 'timeout', 'resignation', 'draw'
   const [opponentConnected, setOpponentConnected] = useState(true);
   const [opponentDisconnectTime, setOpponentDisconnectTime] = useState(null);
   const [canClaimVictory, setCanClaimVictory] = useState(false);
+  const [drawOffered, setDrawOffered] = useState(false);
+  const [drawOfferedByMe, setDrawOfferedByMe] = useState(false);
   const lastMoveRef = useRef(null);
   const gameEndedRef = useRef(false);
   const heartbeatIntervalRef = useRef(null);
@@ -29,10 +33,13 @@ export const useChess = (gameId, userId, isPlayerWhite, setWhiteTime, setBlackTi
     
     let result;
     let winnerId = null;
+    let endReason = null;
 
     if (game.isCheckmate()) {
       const winnerColor = game.turn() === 'w' ? 'black' : 'white';
       setWinner(winnerColor);
+      setGameEndReason('checkmate'); // Set reason immediately
+      endReason = 'checkmate';
       
       if (winnerColor === 'white') {
         result = 0;
@@ -43,8 +50,12 @@ export const useChess = (gameId, userId, isPlayerWhite, setWhiteTime, setBlackTi
       }
     } else if (game.isStalemate()) {
       result = 3;
+      setGameEndReason('draw');
+      endReason = 'draw';
     } else if (game.isDraw()) {
       result = 2;
+      setGameEndReason('draw');
+      endReason = 'draw';
     }
 
     try {
@@ -149,6 +160,15 @@ export const useChess = (gameId, userId, isPlayerWhite, setWhiteTime, setBlackTi
               setFen(game.fen());
               setMoveHistory(game.history());
               
+              // Play sound based on move type
+              if (game.isCheck()) {
+                soundService.playCheck();
+              } else if (move.captured) {
+                soundService.playCapture();
+              } else {
+                soundService.playMove();
+              }
+              
               if (moveData.whiteTimeLeft !== undefined && setWhiteTime) {
                 setWhiteTime(moveData.whiteTimeLeft);
               }
@@ -190,18 +210,46 @@ export const useChess = (gameId, userId, isPlayerWhite, setWhiteTime, setBlackTi
           setCanClaimVictory(true);
         });
 
+        signalRService.onDrawOffered((data) => {
+          console.log('Draw offered by opponent:', data);
+          if (data.playerId !== userId) {
+            setDrawOffered(true);
+            soundService.playNotify();
+          }
+        });
+
+        signalRService.onDrawDeclined(() => {
+          console.log('Draw declined by opponent');
+          setDrawOfferedByMe(false);
+        });
+
         signalRService.onGameEnded(async (data) => {
           console.log('Game ended:', data);
-          setGameOver(true);
           
-          if (data.result === 'timeout') {
-            if (data.winnerId === userId) {
-              setWinner(isPlayerWhite ? 'white' : 'black');
-            } else {
-              setWinner(isPlayerWhite ? 'black' : 'white');
+          // Don't override if game already ended locally (e.g., checkmate detected on frontend)
+          if (!gameEndedRef.current) {
+            setGameOver(true);
+            gameEndedRef.current = true;
+            soundService.playGameEnd();
+            
+            // Set game end reason only if not already set
+            setGameEndReason(prev => prev || data.result);
+            
+            if (data.result === 'timeout') {
+              if (data.winnerId === userId) {
+                setWinner(isPlayerWhite ? 'white' : 'black');
+              } else {
+                setWinner(isPlayerWhite ? 'black' : 'white');
+              }
+            } else if (data.result === 'resignation') {
+              if (data.winnerId === userId) {
+                setWinner(isPlayerWhite ? 'white' : 'black');
+              } else {
+                setWinner(isPlayerWhite ? 'black' : 'white');
+              }
+            } else if (data.result === 'draw') {
+              setWinner(null);
             }
-          } else if (data.result === 'draw') {
-            setWinner(null);
           }
           
           // Get Elo change from response
@@ -209,7 +257,23 @@ export const useChess = (gameId, userId, isPlayerWhite, setWhiteTime, setBlackTi
             const myChange = userId === data.eloChanges.whitePlayerId 
               ? data.eloChanges.whiteChange 
               : data.eloChanges.blackChange;
+            console.log('Setting eloChange from GameEnded:', myChange);
             setEloChange(myChange);
+          }
+        });
+
+        signalRService.onBerserkActivated((data) => {
+          console.log('Berserk activated:', data);
+          // Update time for the player who activated berserk
+          if (data.isWhite) {
+            setWhiteTime(data.newTimeLeft);
+          } else {
+            setBlackTime(data.newTimeLeft);
+          }
+          
+          // Notify via callback if provided
+          if (window.onBerserkActivated) {
+            window.onBerserkActivated(data);
           }
         });
 
@@ -253,12 +317,22 @@ export const useChess = (gameId, userId, isPlayerWhite, setWhiteTime, setBlackTi
         setMoveHistory(game.history()); // Update history immediately
         setIsMyTurn(false);
 
+        // Play sound based on move type
+        if (game.isCheck()) {
+          soundService.playCheck();
+        } else if (move.captured) {
+          soundService.playCapture();
+        } else {
+          soundService.playMove();
+        }
+
         const currentWhiteTime = whiteTimeRef?.current ?? 600;
         const currentBlackTime = blackTimeRef?.current ?? 600;
-        console.log('Sending move with time:', { currentWhiteTime, currentBlackTime });
+        const currentFen = game.fen();
+        console.log('Sending move with time:', { currentWhiteTime, currentBlackTime, currentFen });
         
         lastMoveRef.current = move.san;
-        await signalRService.makeMove(gameId, move.san, currentWhiteTime, currentBlackTime);
+        await signalRService.makeMove(gameId, move.san, currentFen, currentWhiteTime, currentBlackTime);
         console.log('Move sent successfully');
 
         if (game.isGameOver()) {
@@ -299,6 +373,56 @@ export const useChess = (gameId, userId, isPlayerWhite, setWhiteTime, setBlackTi
     }
   }, [gameId]);
 
+  const offerDraw = useCallback(async () => {
+    try {
+      await signalRService.offerDraw(gameId, userId);
+      setDrawOfferedByMe(true);
+      console.log('Draw offered');
+    } catch (error) {
+      console.error('Failed to offer draw:', error);
+    }
+  }, [gameId, userId]);
+
+  const acceptDraw = useCallback(async () => {
+    try {
+      await signalRService.acceptDraw(gameId);
+      setDrawOffered(false);
+      console.log('Draw accepted');
+    } catch (error) {
+      console.error('Failed to accept draw:', error);
+    }
+  }, [gameId]);
+
+  const declineDraw = useCallback(async () => {
+    try {
+      await signalRService.declineDraw(gameId);
+      setDrawOffered(false);
+      console.log('Draw declined');
+    } catch (error) {
+      console.error('Failed to decline draw:', error);
+    }
+  }, [gameId]);
+
+  const resign = useCallback(async () => {
+    try {
+      await signalRService.resign(gameId, userId);
+      console.log('Resigned');
+    } catch (error) {
+      console.error('Failed to resign:', error);
+    }
+  }, [gameId, userId]);
+
+  const activateBerserk = useCallback(async () => {
+    try {
+      await signalRService.activateBerserk(gameId, userId);
+      console.log('Berserk activated');
+      return true;
+    } catch (error) {
+      console.error('Failed to activate berserk:', error);
+      return false;
+    }
+  }, [gameId, userId]);
+
   return {
     fen,
     moveHistory,
@@ -306,6 +430,7 @@ export const useChess = (gameId, userId, isPlayerWhite, setWhiteTime, setBlackTi
     gameOver,
     winner,
     eloChange,
+    gameEndReason,
     makeMove,
     isValidMove,
     isCheck: game.isCheck(),
@@ -317,6 +442,13 @@ export const useChess = (gameId, userId, isPlayerWhite, setWhiteTime, setBlackTi
     opponentDisconnectTime,
     canClaimVictory,
     claimVictory,
-    offerDrawAfterDisconnect
+    offerDrawAfterDisconnect,
+    drawOffered,
+    drawOfferedByMe,
+    offerDraw,
+    acceptDraw,
+    declineDraw,
+    resign,
+    activateBerserk
   };
 };

@@ -21,7 +21,7 @@ public class GameService : IGameService
         _logger = logger;
     }
 
-    public async Task<Game?> CreateGameAsync(int whitePlayerId, int blackPlayerId, string timeControl)
+    public async Task<Game?> CreateGameAsync(int whitePlayerId, int blackPlayerId, string timeControl, bool isRanked = true)
     {
         var whitePlayer = await _context.Users.FindAsync(whitePlayerId);
         var blackPlayer = await _context.Users.FindAsync(blackPlayerId);
@@ -32,19 +32,33 @@ public class GameService : IGameService
             return null;
         }
 
+        // Parse time control (format: "10+0" means 10 minutes + 0 increment)
+        var timeInSeconds = 600; // Default 10 minutes
+        if (!string.IsNullOrEmpty(timeControl))
+        {
+            var parts = timeControl.Split('+');
+            if (parts.Length > 0 && int.TryParse(parts[0], out var minutes))
+            {
+                timeInSeconds = minutes * 60;
+            }
+        }
+
         var game = new Game
         {
             WhitePlayerId = whitePlayerId,
             BlackPlayerId = blackPlayerId,
             TimeControl = timeControl,
             Status = GameStatus.Pending,
+            IsRanked = isRanked,
+            WhiteTimeLeft = timeInSeconds,
+            BlackTimeLeft = timeInSeconds,
             CreatedAt = DateTime.UtcNow
         };
 
         _context.Games.Add(game);
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation($"Game created: {game.Id}");
+        _logger.LogInformation($"Game created: {game.Id}, IsRanked: {isRanked}, TimeControl: {timeControl}, Time: {timeInSeconds}s");
         return game;
     }
 
@@ -118,19 +132,22 @@ public class GameService : IGameService
                 break;
         }
 
-        // Обновляем Elo рейтинги
-        var eloResult = result switch
+        // Обновляем Elo рейтинги только для ranked игр
+        if (game.IsRanked)
         {
-            Models.GameResult.WhiteWin => Interfaces.GameResult.WhiteWin,
-            Models.GameResult.BlackWin => Interfaces.GameResult.BlackWin,
-            _ => Interfaces.GameResult.Draw
-        };
+            var eloResult = result switch
+            {
+                Models.GameResult.WhiteWin => Interfaces.GameResult.WhiteWin,
+                Models.GameResult.BlackWin => Interfaces.GameResult.BlackWin,
+                _ => Interfaces.GameResult.Draw
+            };
 
-        var (newWhiteElo, newBlackElo) = _eloCalculator.CalculateNewRatings(
-            whitePlayer.Elo, blackPlayer.Elo, eloResult);
+            var (newWhiteElo, newBlackElo) = _eloCalculator.CalculateNewRatings(
+                whitePlayer.GetRating(game.TimeControl), blackPlayer.GetRating(game.TimeControl), eloResult, game.WhitePlayerBerserk, game.BlackPlayerBerserk);
 
-        whitePlayer.Elo = newWhiteElo;
-        blackPlayer.Elo = newBlackElo;
+            whitePlayer.SetRating(game.TimeControl, newWhiteElo);
+            blackPlayer.SetRating(game.TimeControl, newBlackElo);
+        }
 
         await _context.SaveChangesAsync();
 

@@ -39,8 +39,8 @@ class ApiService {
     return response.json();
   }
 
-  async getLeaderboard(limit = 100) {
-    const response = await fetch(`${API_URL}/users/leaderboard?limit=${limit}`);
+  async getLeaderboard(limit = 100, category = 'rapid') {
+    const response = await fetch(`${API_URL}/users/leaderboard?limit=${limit}&category=${category}`);
     
     if (!response.ok) {
       throw new Error('Failed to fetch leaderboard');
@@ -73,11 +73,36 @@ class ApiService {
     return response.json();
   }
 
+  async getGameChat(gameId) {
+    const response = await fetch(`${API_URL}/games/${gameId}/chat`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch chat messages');
+    }
+
+    return response.json();
+  }
+
   async getUserGames(userId) {
     const response = await fetch(`${API_URL}/games/user/${userId}`);
     
     if (!response.ok) {
       throw new Error('Failed to fetch games');
+    }
+
+    return response.json();
+  }
+
+  async getUserGameHistory(userId, result = null, page = 1, pageSize = 20) {
+    let url = `${API_URL}/games/user/${userId}/history?page=${page}&pageSize=${pageSize}`;
+    if (result) {
+      url += `&result=${result}`;
+    }
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch game history');
     }
 
     return response.json();
@@ -176,6 +201,198 @@ class ApiService {
 
     return response.json();
   }
+
+  async analyzeGame(gameId) {
+    const response = await fetch(`${API_URL}/analysis/game/${gameId}`, {
+      method: 'POST'
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Analysis error:', errorData);
+      throw new Error(errorData.message || `Failed to analyze game: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  // Friends API
+  async getFriends(userId) {
+    const response = await fetch(`${API_URL}/friends/${userId}`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch friends');
+    }
+
+    return response.json();
+  }
+
+  async getFriendRequests(userId) {
+    const response = await fetch(`${API_URL}/friends/${userId}/requests`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch friend requests');
+    }
+
+    return response.json();
+  }
+
+  // Challenges API
+  async getPendingChallenges(userId) {
+    const response = await fetch(`${API_URL}/challenges/pending/${userId}`);
+    
+    if (!response.ok) {
+      // If endpoint doesn't exist yet, return empty array
+      return [];
+    }
+
+    return response.json();
+  }
+
+  async sendFriendRequest(requesterId, addresseeId) {
+    const response = await fetch(`${API_URL}/friends/request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requesterId, addresseeId })
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || 'Failed to send friend request');
+    }
+
+    return response.json();
+  }
+
+  async acceptFriendRequest(friendshipId) {
+    const response = await fetch(`${API_URL}/friends/accept/${friendshipId}`, {
+      method: 'POST'
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to accept friend request');
+    }
+
+    return response.json();
+  }
+
+  async rejectFriendRequest(friendshipId) {
+    const response = await fetch(`${API_URL}/friends/reject/${friendshipId}`, {
+      method: 'POST'
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to reject friend request');
+    }
+
+    return response.json();
+  }
+
+  async removeFriend(friendshipId) {
+    const response = await fetch(`${API_URL}/friends/${friendshipId}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to remove friend');
+    }
+
+    return response.json();
+  }
+
+  // AI Coach
+  async getAIAnalysis(gameId, language = 'en') {
+    const response = await fetch(`${API_URL}/aicoach/analyze/${gameId}?language=${language}`, {
+      method: 'POST'
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get AI analysis');
+    }
+
+    return response.json();
+  }
+
+  async chatWithAI(message, gameId = null, language = 'en') {
+    const response = await fetch(`${API_URL}/aicoach/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, gameId, language })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to chat with AI');
+    }
+
+    return response.json();
+  }
+
+  // Puzzles API
+  async getRandomPuzzle(userId, rating = null) {
+    let url = `${API_URL}/puzzles/random?userId=${userId}`;
+    if (rating) {
+      url += `&rating=${rating}`;
+    }
+    
+    console.log('Fetching puzzle from:', url);
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Puzzle fetch failed:', response.status, errorText);
+      throw new Error(`Failed to fetch puzzle: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('Puzzle data received:', data);
+    return data;
+  }
+
+  async checkPuzzleSolution(userId, puzzleId, move) {
+    const response = await fetch(`${API_URL}/puzzles/check`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, puzzleId, move })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to check solution');
+    }
+
+    return response.json();
+  }
+
+  async getPuzzleStats(userId) {
+    const response = await fetch(`${API_URL}/puzzles/stats/${userId}`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch puzzle stats');
+    }
+
+    return response.json();
+  }
+
+  async getPuzzlesByTheme(theme, count = 10) {
+    const response = await fetch(`${API_URL}/puzzles/theme/${theme}?count=${count}`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch puzzles by theme');
+    }
+
+    return response.json();
+  }
+
+  // Live Games API
+  async getActiveGames(limit = 20) {
+    const response = await fetch(`${API_URL}/games/active?limit=${limit}`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch active games');
+    }
+
+    return response.json();
+  }
 }
 
 export default new ApiService();
+

@@ -4,18 +4,139 @@ import { GiChessKnight } from 'react-icons/gi';
 import ChessBoard from './components/ChessBoard';
 import Matchmaking from './components/Matchmaking';
 import Profile from './components/Profile';
+import UserProfile from './components/UserProfile';
 import Leaderboard from './components/Leaderboard';
 import Auth from './components/Auth';
+import GameHistory from './components/GameHistory';
+import GameReplay from './components/GameReplay';
+import Coach from './components/Coach';
+import Puzzles from './components/Puzzles';
+import LiveGames from './components/LiveGames';
+import SpectatorBoard from './components/SpectatorBoard';
+import LanguageSwitcher from './components/LanguageSwitcher';
+import NotificationsPanel from './components/NotificationsPanel';
+import { useLanguage } from './i18n/LanguageContext';
 import apiService from './services/apiService';
+import signalRService from './services/signalRService';
 import './App.css';
+import './styles/components-responsive.css';
+import './styles/profile-coach-responsive.css';
 
 function App() {
+  const { t } = useLanguage();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationsCount, setNotificationsCount] = useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     initUser();
+    setupNotificationListeners();
   }, []);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [window.location.pathname]);
+
+  // Close mobile menu when clicking outside & prevent body scroll
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (mobileMenuOpen && !event.target.closest('.nav') && !event.target.closest('.mobile-menu')) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    // Prevent body scroll when menu is open
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.body.style.overflow = 'unset';
+    };
+  }, [mobileMenuOpen]);
+
+  const setupNotificationListeners = async () => {
+    const savedUserId = localStorage.getItem('userId');
+    if (!savedUserId) return;
+
+    try {
+      // Load initial counts (only incoming)
+      const [requestsData, challengesData] = await Promise.all([
+        apiService.getFriendRequests(parseInt(savedUserId)),
+        apiService.getPendingChallenges(parseInt(savedUserId))
+      ]);
+      
+      const totalCount = (requestsData.incoming?.length || 0) + (challengesData.incoming?.length || 0);
+      setNotificationsCount(totalCount);
+
+      // Connect to SignalR and wait for connection
+      await signalRService.connect();
+      console.log('App.jsx: SignalR connected');
+      
+      // Small delay to ensure connection is ready
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      await signalRService.joinUserChannel(parseInt(savedUserId));
+      console.log('App.jsx: Joined user channel:', savedUserId);
+
+      // Setup event listeners with functional updates (like useChess.js)
+      signalRService.onFriendRequestReceived(() => {
+        console.log('App.jsx: Friend request received');
+        setNotificationsCount(prev => prev + 1);
+      });
+
+      signalRService.onFriendRequestAccepted(() => {
+        console.log('App.jsx: Friend request accepted');
+        setNotificationsCount(prev => Math.max(0, prev - 1));
+      });
+
+      signalRService.onFriendRequestRejected(() => {
+        console.log('App.jsx: Friend request rejected');
+        setNotificationsCount(prev => Math.max(0, prev - 1));
+      });
+
+      signalRService.onChallengeReceived((data) => {
+        console.log('App.jsx: Challenge received', data);
+        setNotificationsCount(prev => prev + 1);
+      });
+
+      signalRService.onChallengeAccepted((data) => {
+        console.log('App.jsx: Challenge accepted', data);
+        setNotificationsCount(prev => Math.max(0, prev - 1));
+        // Navigate to game immediately
+        if (data.gameId) {
+          console.log('App.jsx: Navigating to game:', data.gameId);
+          window.location.href = `/game/${data.gameId}`;
+        }
+      });
+
+      signalRService.onChallengeCancelled(() => {
+        console.log('App.jsx: Challenge cancelled');
+        setNotificationsCount(prev => Math.max(0, prev - 1));
+      });
+
+      signalRService.onChallengeDeclined(() => {
+        console.log('App.jsx: Challenge declined');
+        setNotificationsCount(prev => Math.max(0, prev - 1));
+      });
+
+      signalRService.onError((message) => {
+        console.error('SignalR Error:', message);
+        alert(message);
+      });
+    } catch (error) {
+      console.error('Failed to setup notification listeners:', error);
+    }
+  };
+
+
 
   const initUser = async () => {
     try {
@@ -44,13 +165,7 @@ function App() {
     const userData = await apiService.getUser(authData.userId);
     setUser(userData);
     
-    // Если это гость, перенаправляем сразу в матчмейкинг
-    if (authData.isGuest) {
-      // Используем setTimeout чтобы дать время на рендер
-      setTimeout(() => {
-        window.location.href = '/play';
-      }, 100);
-    }
+    // No auto-redirect - let user choose what to do
   };
 
   const handleLogout = () => {
@@ -58,6 +173,8 @@ function App() {
     localStorage.removeItem('username');
     localStorage.removeItem('isAnonymous');
     setUser(null);
+    // Redirect to login page
+    window.location.href = '/login';
   };
 
   if (loading) {
@@ -68,23 +185,36 @@ function App() {
         alignItems: 'center', 
         height: '100vh' 
       }}>
-        Loading...
+        {t('common.loading')}
       </div>
     );
   }
 
   if (!user) {
-    return <Auth onAuthSuccess={handleAuthSuccess} />;
+    return (
+      <Router>
+        <Routes>
+          <Route path="/login" element={<Auth onAuthSuccess={handleAuthSuccess} />} />
+          <Route path="*" element={<Auth onAuthSuccess={handleAuthSuccess} />} />
+        </Routes>
+      </Router>
+    );
   }
 
   return (
     <Router>
       <div className="app">
+        <NotificationsPanel
+          userId={user.id}
+          isOpen={notificationsOpen}
+          onClose={() => setNotificationsOpen(false)}
+        />
+        
         <nav className="nav">
           <div className="nav-content">
-            <Link to="/" className="nav-logo">
+            <Link to="/" className="nav-logo" onClick={() => setMobileMenuOpen(false)}>
               <GiChessKnight 
-                size={40} 
+                size={32} 
                 style={{ 
                   color: '#d4af37',
                   filter: 'drop-shadow(0 0 10px rgba(212, 175, 55, 0.6))'
@@ -92,22 +222,173 @@ function App() {
               />
               <span>Blunderz</span>
             </Link>
-            <div className="nav-links">
-              <Link to="/play" className="nav-link">Play</Link>
-              <Link to="/profile" className="nav-link">Profile</Link>
-              <Link to="/leaderboard" className="nav-link">Leaderboard</Link>
+
+            {/* Burger button - visible only on mobile */}
+            <button 
+              className="burger-menu"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle menu"
+            >
+              <span className={mobileMenuOpen ? 'active' : ''}></span>
+              <span className={mobileMenuOpen ? 'active' : ''}></span>
+              <span className={mobileMenuOpen ? 'active' : ''}></span>
+            </button>
+
+            {/* Desktop navigation */}
+            <div className="nav-links nav-links-desktop">
+              <Link to="/play" className="nav-link">{t('nav.play')}</Link>
+              <Link to="/puzzles" className="nav-link">{t('nav.puzzles')}</Link>
+              <Link to="/live" className="nav-link">{t('nav.liveGames')}</Link>
+              <Link to="/history" className="nav-link">{t('nav.history')}</Link>
+              <Link to="/coach" className="nav-link">{t('nav.coach')}</Link>
+              <Link to="/profile" className="nav-link">{t('nav.profile')}</Link>
+              <Link to="/leaderboard" className="nav-link">{t('nav.leaderboard')}</Link>
             </div>
-            <div className="nav-user">
+
+            <div className="nav-user nav-user-desktop">
               <div className="nav-user-info">
                 <span>{user.username}</span>
                 <span className="nav-user-elo">({user.elo})</span>
               </div>
+              <button
+                onClick={() => setNotificationsOpen(!notificationsOpen)}
+                className="notification-btn"
+                style={{
+                  position: 'relative',
+                  background: notificationsOpen ? 'rgba(212, 175, 55, 0.1)' : 'var(--color-surface)',
+                  border: `2px solid ${notificationsOpen ? '#d4af37' : 'var(--color-border)'}`,
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontSize: '20px',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: '48px',
+                  height: '40px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(212, 175, 55, 0.1)';
+                  e.currentTarget.style.borderColor = '#d4af37';
+                }}
+                onMouseLeave={(e) => {
+                  if (!notificationsOpen) {
+                    e.currentTarget.style.background = 'var(--color-surface)';
+                    e.currentTarget.style.borderColor = 'var(--color-border)';
+                  }
+                }}
+                title={t('nav.notifications')}
+              >
+                🔔
+                {notificationsCount > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-4px',
+                    background: '#ff5722',
+                    color: '#fff',
+                    borderRadius: '50%',
+                    width: '20px',
+                    height: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    boxShadow: '0 2px 8px rgba(255, 87, 34, 0.6)',
+                    border: '2px solid var(--color-background)'
+                  }}>
+                    {notificationsCount}
+                  </span>
+                )}
+              </button>
+              <LanguageSwitcher />
               <button 
                 onClick={handleLogout}
                 className="btn-outline"
                 style={{ padding: '6px 16px', fontSize: '14px' }}
               >
-                Logout
+                {t('nav.logout')}
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile menu */}
+          <div className={`mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
+            <div className="mobile-menu-header">
+              <div className="nav-user-info">
+                <span>{user.username}</span>
+                <span className="nav-user-elo">({user.elo})</span>
+              </div>
+            </div>
+            <div className="mobile-menu-links">
+              <Link to="/play" className="mobile-menu-link" onClick={() => setMobileMenuOpen(false)}>
+                ⚡ {t('nav.play')}
+              </Link>
+              <Link to="/puzzles" className="mobile-menu-link" onClick={() => setMobileMenuOpen(false)}>
+                🧩 {t('nav.puzzles')}
+              </Link>
+              <Link to="/live" className="mobile-menu-link" onClick={() => setMobileMenuOpen(false)}>
+                👁️ {t('nav.liveGames')}
+              </Link>
+              <Link to="/history" className="mobile-menu-link" onClick={() => setMobileMenuOpen(false)}>
+                📜 {t('nav.history')}
+              </Link>
+              <Link to="/coach" className="mobile-menu-link" onClick={() => setMobileMenuOpen(false)}>
+                🤖 {t('nav.coach')}
+              </Link>
+              <Link to="/profile" className="mobile-menu-link" onClick={() => setMobileMenuOpen(false)}>
+                👤 {t('nav.profile')}
+              </Link>
+              <Link to="/leaderboard" className="mobile-menu-link" onClick={() => setMobileMenuOpen(false)}>
+                🏆 {t('nav.leaderboard')}
+              </Link>
+            </div>
+            <div className="mobile-menu-actions">
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'center' }}>
+                <button
+                  onClick={() => {
+                    setNotificationsOpen(!notificationsOpen);
+                    setMobileMenuOpen(false);
+                  }}
+                  style={{
+                    position: 'relative',
+                    background: 'var(--color-surface)',
+                    border: '2px solid var(--color-border)',
+                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: '20px',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: '48px',
+                    height: '40px'
+                  }}
+                >
+                  🔔
+                  {notificationsCount > 0 && (
+                    <span className="notification-badge" style={{
+                      position: 'absolute',
+                      top: '-4px',
+                      right: '-4px'
+                    }}>{notificationsCount}</span>
+                  )}
+                </button>
+                <LanguageSwitcher />
+              </div>
+              <button 
+                onClick={() => {
+                  handleLogout();
+                  setMobileMenuOpen(false);
+                }}
+                className="mobile-menu-btn"
+              >
+                {t('nav.logout')}
               </button>
             </div>
           </div>
@@ -116,8 +397,15 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/play" element={<PlayPage userId={user.id} />} />
+          <Route path="/puzzles" element={<Puzzles userId={user.id} />} />
+          <Route path="/live" element={<LiveGames />} />
+          <Route path="/watch/:gameId" element={<WatchGamePage />} />
           <Route path="/game/:gameId" element={<GamePage userId={user.id} onUserUpdate={setUser} />} />
+          <Route path="/game/:gameId/replay" element={<GameReplay />} />
+          <Route path="/history" element={<GameHistory userId={user.id} />} />
+          <Route path="/coach" element={<Coach userId={user.id} />} />
           <Route path="/profile" element={<Profile userId={user.id} />} />
+          <Route path="/user/:userId" element={<UserProfile />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
         </Routes>
       </div>
@@ -126,6 +414,7 @@ function App() {
 }
 
 function Home() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   return (
@@ -161,7 +450,7 @@ function Home() {
           fontWeight: '700',
           textShadow: '0 0 30px rgba(212, 175, 55, 0.3)'
         }}>
-          Blunderz
+          {t('home.title')}
         </h1>
         <p style={{ 
           color: 'var(--color-text-secondary)', 
@@ -170,7 +459,7 @@ function Home() {
           maxWidth: '600px',
           margin: '0 auto 48px'
         }}>
-          Master the art of chess. Play, compete, and rise through the ranks.
+          {t('home.subtitle')}
         </p>
         
         <button
@@ -183,8 +472,25 @@ function Home() {
             boxShadow: '0 8px 30px rgba(212, 175, 55, 0.5)'
           }}
         >
-          Play Now
+          {t('home.playNow')}
         </button>
+        
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '16px' }}>
+          <button
+            onClick={() => navigate('/history')}
+            className="btn-outline"
+            style={{ padding: '12px 24px', fontSize: '16px' }}
+          >
+            📜 {t('home.gameHistory')}
+          </button>
+          <button
+            onClick={() => navigate('/leaderboard')}
+            className="btn-outline"
+            style={{ padding: '12px 24px', fontSize: '16px' }}
+          >
+            🏆 {t('home.leaderboard')}
+          </button>
+        </div>
       </div>
 
       <div style={{ 
@@ -203,9 +509,9 @@ function Home() {
             marginBottom: '12px',
             fontSize: '20px',
             color: '#d4af37'
-          }}>Fast Matchmaking</h3>
+          }}>{t('home.fastMatchmaking')}</h3>
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '15px' }}>
-            Find opponents instantly with our smart Elo-based matching system
+            {t('home.fastMatchmakingDesc')}
           </p>
         </div>
         <div className="card" style={{ textAlign: 'center' }}>
@@ -218,9 +524,9 @@ function Home() {
             marginBottom: '12px',
             fontSize: '20px',
             color: '#d4af37'
-          }}>Rating System</h3>
+          }}>{t('home.ratingSystem')}</h3>
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '15px' }}>
-            Track your progress with our advanced Elo rating system
+            {t('home.ratingSystemDesc')}
           </p>
         </div>
         <div className="card" style={{ textAlign: 'center' }}>
@@ -233,9 +539,9 @@ function Home() {
             marginBottom: '12px',
             fontSize: '20px',
             color: '#d4af37'
-          }}>Leaderboards</h3>
+          }}>{t('home.leaderboards')}</h3>
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '15px' }}>
-            Compete with players worldwide and climb to the top
+            {t('home.leaderboardsDesc')}
           </p>
         </div>
       </div>
@@ -254,6 +560,7 @@ function PlayPage({ userId }) {
 }
 
 function GamePage({ userId, onUserUpdate }) {
+  const { t } = useLanguage();
   const [gameData, setGameData] = useState(null);
   const [loading, setLoading] = useState(true);
   const eloUpdatedRef = useRef(false);
@@ -268,19 +575,24 @@ function GamePage({ userId, onUserUpdate }) {
   const loadGame = async () => {
     try {
       const game = await apiService.getGame(gameId);
+      console.log('Game loaded:', game);
       setGameData(game);
       
       // Start game if pending (status 0 = Pending, 1 = Active)
       if (game.status === 0) {
+        console.log('Game is pending, starting...');
         try {
           await apiService.startGame(gameId);
           // Reload game to get updated status
           const updatedGame = await apiService.getGame(gameId);
+          console.log('Game started, updated status:', updatedGame.status);
           setGameData(updatedGame);
         } catch (error) {
           console.warn('Failed to start game (might be already started):', error);
           // Game might be already started, continue anyway
         }
+      } else {
+        console.log('Game status:', game.status);
       }
     } catch (error) {
       console.error('Failed to load game:', error);
@@ -307,11 +619,11 @@ function GamePage({ userId, onUserUpdate }) {
   };
 
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: '50px' }}>Loading game...</div>;
+    return <div style={{ textAlign: 'center', padding: '50px' }}>{t('common.loadingGame')}</div>;
   }
 
   if (!gameData) {
-    return <div style={{ textAlign: 'center', padding: '50px' }}>Game not found</div>;
+    return <div style={{ textAlign: 'center', padding: '50px' }}>{t('common.gameNotFound')}</div>;
   }
 
   const isPlayerWhite = gameData.whitePlayerId === userId;
@@ -324,6 +636,16 @@ function GamePage({ userId, onUserUpdate }) {
         isPlayerWhite={isPlayerWhite}
         onEloChange={handleEloChange}
       />
+    </div>
+  );
+}
+
+function WatchGamePage() {
+  const gameId = window.location.pathname.split('/').pop();
+  
+  return (
+    <div>
+      <SpectatorBoard gameId={gameId} />
     </div>
   );
 }

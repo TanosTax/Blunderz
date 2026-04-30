@@ -71,12 +71,33 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet("leaderboard")]
-    public async Task<ActionResult<List<User>>> GetLeaderboard([FromQuery] int limit = 100)
+    public async Task<ActionResult<List<User>>> GetLeaderboard(
+        [FromQuery] int limit = 100,
+        [FromQuery] string category = "rapid")
     {
-        var users = await _context.Users
-            .OrderByDescending(u => u.Elo)
-            .Take(limit)
-            .ToListAsync();
+        var users = category.ToLower() switch
+        {
+            "bullet" => await _context.Users
+                .OrderByDescending(u => u.BulletRating)
+                .Take(limit)
+                .ToListAsync(),
+            "blitz" => await _context.Users
+                .OrderByDescending(u => u.BlitzRating)
+                .Take(limit)
+                .ToListAsync(),
+            "rapid" => await _context.Users
+                .OrderByDescending(u => u.RapidRating)
+                .Take(limit)
+                .ToListAsync(),
+            "classical" => await _context.Users
+                .OrderByDescending(u => u.ClassicalRating)
+                .Take(limit)
+                .ToListAsync(),
+            _ => await _context.Users
+                .OrderByDescending(u => u.RapidRating)
+                .Take(limit)
+                .ToListAsync()
+        };
 
         return users;
     }

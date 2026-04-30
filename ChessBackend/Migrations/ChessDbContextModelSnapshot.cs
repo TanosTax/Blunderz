@@ -22,11 +22,129 @@ namespace ChessBackend.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("ChessBackend.Models.Challenge", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ChallengedId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ChallengerId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("GameId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("RespondedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TimeControl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChallengedId");
+
+                    b.HasIndex("ChallengerId");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("Challenges");
+                });
+
+            modelBuilder.Entity("ChessBackend.Models.ChatMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GameId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("GameId");
+
+                    b.HasIndex("PlayerId");
+
+                    b.ToTable("ChatMessages");
+                });
+
+            modelBuilder.Entity("ChessBackend.Models.Friendship", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AddresseeId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RequesterId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AddresseeId");
+
+                    b.HasIndex("RequesterId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("RequesterId", "AddresseeId")
+                        .IsUnique();
+
+                    b.ToTable("Friendships");
+                });
+
             modelBuilder.Entity("ChessBackend.Models.Game", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("BlackPlayerBerserk")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("BlackPlayerConnected")
                         .HasColumnType("boolean");
@@ -50,6 +168,9 @@ namespace ChessBackend.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<bool>("IsRanked")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("PGN")
                         .IsRequired()
                         .HasColumnType("text");
@@ -67,6 +188,9 @@ namespace ChessBackend.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
+
+                    b.Property<bool>("WhitePlayerBerserk")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("WhitePlayerConnected")
                         .HasColumnType("boolean");
@@ -210,6 +334,44 @@ namespace ChessBackend.Migrations
                     b.ToTable("Moves");
                 });
 
+            modelBuilder.Entity("ChessBackend.Models.Puzzle", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Fen")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Moves")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Popularity")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Themes")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Rating");
+
+                    b.HasIndex("Themes");
+
+                    b.ToTable("Puzzles");
+                });
+
             modelBuilder.Entity("ChessBackend.Models.User", b =>
                 {
                     b.Property<int>("Id")
@@ -217,6 +379,15 @@ namespace ChessBackend.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BlitzRating")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("BulletRating")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ClassicalRating")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -246,6 +417,12 @@ namespace ChessBackend.Migrations
                     b.Property<string>("PasswordHash")
                         .HasColumnType("text");
 
+                    b.Property<int>("PuzzleRating")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RapidRating")
+                        .HasColumnType("integer");
+
                     b.Property<long?>("TelegramId")
                         .HasColumnType("bigint");
 
@@ -267,6 +444,97 @@ namespace ChessBackend.Migrations
                     b.HasIndex("Username");
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("ChessBackend.Models.UserPuzzleAttempt", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AttemptedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PuzzleId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("Solved")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PuzzleId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "PuzzleId");
+
+                    b.ToTable("UserPuzzleAttempts");
+                });
+
+            modelBuilder.Entity("ChessBackend.Models.Challenge", b =>
+                {
+                    b.HasOne("ChessBackend.Models.User", "Challenged")
+                        .WithMany()
+                        .HasForeignKey("ChallengedId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ChessBackend.Models.User", "Challenger")
+                        .WithMany()
+                        .HasForeignKey("ChallengerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Challenged");
+
+                    b.Navigation("Challenger");
+                });
+
+            modelBuilder.Entity("ChessBackend.Models.ChatMessage", b =>
+                {
+                    b.HasOne("ChessBackend.Models.Game", "Game")
+                        .WithMany()
+                        .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ChessBackend.Models.User", "Player")
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Game");
+
+                    b.Navigation("Player");
+                });
+
+            modelBuilder.Entity("ChessBackend.Models.Friendship", b =>
+                {
+                    b.HasOne("ChessBackend.Models.User", "Addressee")
+                        .WithMany()
+                        .HasForeignKey("AddresseeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ChessBackend.Models.User", "Requester")
+                        .WithMany()
+                        .HasForeignKey("RequesterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Addressee");
+
+                    b.Navigation("Requester");
                 });
 
             modelBuilder.Entity("ChessBackend.Models.Game", b =>
@@ -327,6 +595,25 @@ namespace ChessBackend.Migrations
                         .IsRequired();
 
                     b.Navigation("Game");
+                });
+
+            modelBuilder.Entity("ChessBackend.Models.UserPuzzleAttempt", b =>
+                {
+                    b.HasOne("ChessBackend.Models.Puzzle", "Puzzle")
+                        .WithMany()
+                        .HasForeignKey("PuzzleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ChessBackend.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Puzzle");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("ChessBackend.Models.Game", b =>

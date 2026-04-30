@@ -1,22 +1,22 @@
 import { useState, useRef, useEffect } from 'react';
 import apiService from '../services/apiService';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export default function Matchmaking({ userId, onGameFound }) {
+  const { t } = useLanguage();
   const [searching, setSearching] = useState(false);
   const [timeControl, setTimeControl] = useState('10+0');
   const [eloRange, setEloRange] = useState(200);
-  const [isGuest, setIsGuest] = useState(false);
   const pollIntervalRef = useRef(null);
 
-  // Check if user is guest
+  // Remove auto-start for guests - let them choose time control first
   useEffect(() => {
-    const guestStatus = localStorage.getItem('isAnonymous') === 'true';
-    setIsGuest(guestStatus);
-    
-    // Auto-start search for guests
-    if (guestStatus) {
-      startSearch();
-    }
+    // Cleanup on unmount
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
   }, []);
 
   const startSearch = async () => {
@@ -77,7 +77,7 @@ export default function Matchmaking({ userId, onGameFound }) {
   };
 
   return (
-    <div className="container" style={{ 
+    <div className="container matchmaking-container" style={{ 
       maxWidth: '600px', 
       margin: '80px auto',
       textAlign: 'center'
@@ -89,7 +89,7 @@ export default function Matchmaking({ userId, onGameFound }) {
             fontSize: '32px',
             color: '#d4af37'
           }}>
-            Find a Game
+            {t('matchmaking.title')}
           </h2>
           
           <div style={{ marginBottom: '24px' }}>
@@ -100,7 +100,7 @@ export default function Matchmaking({ userId, onGameFound }) {
               fontSize: '16px',
               fontWeight: '500'
             }}>
-              Time Control
+              {t('matchmaking.timeControl')}
             </label>
             <select 
               value={timeControl} 
@@ -116,12 +116,12 @@ export default function Matchmaking({ userId, onGameFound }) {
                 cursor: 'pointer'
               }}
             >
-              <option value="1+0">⚡ Bullet (1+0)</option>
-              <option value="3+0">⚡ Blitz (3+0)</option>
-              <option value="5+0">⚡ Blitz (5+0)</option>
-              <option value="10+0">🎯 Rapid (10+0)</option>
-              <option value="15+10">🎯 Rapid (15+10)</option>
-              <option value="30+0">♟️ Classical (30+0)</option>
+              <option value="1+0">⚡ {t('matchmaking.bullet')} (1+0)</option>
+              <option value="3+0">⚡ {t('matchmaking.blitz')} (3+0)</option>
+              <option value="5+0">⚡ {t('matchmaking.blitz')} (5+0)</option>
+              <option value="10+0">🎯 {t('matchmaking.rapid')} (10+0)</option>
+              <option value="15+10">🎯 {t('matchmaking.rapid')} (15+10)</option>
+              <option value="30+0">♟️ {t('matchmaking.classical')} (30+0)</option>
             </select>
           </div>
 
@@ -133,7 +133,7 @@ export default function Matchmaking({ userId, onGameFound }) {
               fontSize: '16px',
               fontWeight: '500'
             }}>
-              Rating Range: <span style={{ color: '#d4af37' }}>±{eloRange}</span>
+              {t('matchmaking.ratingRange')}: <span style={{ color: '#d4af37' }}>±{eloRange}</span>
             </label>
             <input 
               type="range" 
@@ -158,8 +158,8 @@ export default function Matchmaking({ userId, onGameFound }) {
               fontSize: '12px',
               color: 'var(--color-text-secondary)'
             }}>
-              <span>Narrow</span>
-              <span>Wide</span>
+              <span>{t('matchmaking.narrow')}</span>
+              <span>{t('matchmaking.wide')}</span>
             </div>
           </div>
 
@@ -172,7 +172,7 @@ export default function Matchmaking({ userId, onGameFound }) {
               fontSize: '18px'
             }}
           >
-            🔍 Find Game
+            🔍 {t('matchmaking.findGame')}
           </button>
         </div>
       ) : (
@@ -190,20 +190,20 @@ export default function Matchmaking({ userId, onGameFound }) {
               fontSize: '28px',
               color: '#d4af37'
             }}>
-              Searching for opponent...
+              {t('matchmaking.searching')}
             </h2>
             <div style={{ 
               fontSize: '15px', 
               color: 'var(--color-text-secondary)',
               marginBottom: '8px'
             }}>
-              Time Control: <span style={{ color: 'var(--color-text-primary)' }}>{timeControl}</span>
+              {t('matchmaking.timeControl')}: <span style={{ color: 'var(--color-text-primary)' }}>{timeControl}</span>
             </div>
             <div style={{ 
               fontSize: '15px', 
               color: 'var(--color-text-secondary)'
             }}>
-              Rating Range: <span style={{ color: 'var(--color-text-primary)' }}>±{eloRange}</span>
+              {t('matchmaking.ratingRange')}: <span style={{ color: 'var(--color-text-primary)' }}>±{eloRange}</span>
             </div>
           </div>
 
@@ -215,7 +215,7 @@ export default function Matchmaking({ userId, onGameFound }) {
               padding: '14px'
             }}
           >
-            Cancel Search
+            {t('matchmaking.cancel')}
           </button>
         </div>
       )}

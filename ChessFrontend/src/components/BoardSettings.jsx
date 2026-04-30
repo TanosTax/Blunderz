@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { GiChessKnight } from 'react-icons/gi';
+import soundService from '../services/soundService';
 
 export default function BoardSettings({ settings, onSettingsChange, onClose }) {
   const [localSettings, setLocalSettings] = useState(settings);
+  const [soundSettings, setSoundSettings] = useState(soundService.getSettings());
 
   const themes = [
     { id: 'gold', name: 'Gold & Black', emoji: '👑' },
@@ -26,6 +28,7 @@ export default function BoardSettings({ settings, onSettingsChange, onClose }) {
   const handleSave = () => {
     onSettingsChange(localSettings);
     localStorage.setItem('boardSettings', JSON.stringify(localSettings));
+    soundService.saveSettings(soundSettings);
     onClose();
   };
 
@@ -53,7 +56,9 @@ export default function BoardSettings({ settings, onSettingsChange, onClose }) {
         maxHeight: '90vh',
         overflowY: 'auto',
         boxShadow: '0 8px 32px rgba(212, 175, 55, 0.3)'
-      }}>
+      }}
+      className="modal-content"
+      >
         {/* Header */}
         <div style={{
           display: 'flex',
@@ -198,6 +203,118 @@ export default function BoardSettings({ settings, onSettingsChange, onClose }) {
               }}
             />
           </label>
+        </div>
+
+        {/* Sound Settings */}
+        <div style={{ marginBottom: '32px' }}>
+          <h3 style={{
+            color: 'var(--color-text-primary)',
+            fontSize: '18px',
+            fontWeight: '600',
+            marginBottom: '16px'
+          }}>
+            🔊 Sound Effects
+          </h3>
+          
+          {/* Enable/Disable Sound */}
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px',
+            background: 'var(--color-background)',
+            border: '1px solid var(--color-border)',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            marginBottom: '16px'
+          }}>
+            <div>
+              <div style={{
+                color: 'var(--color-text-primary)',
+                fontSize: '16px',
+                fontWeight: '600',
+                marginBottom: '4px'
+              }}>
+                Enable Sounds
+              </div>
+              <div style={{
+                color: 'var(--color-text-secondary)',
+                fontSize: '13px'
+              }}>
+                Play sounds for moves and events
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={soundSettings.enabled}
+              onChange={(e) => {
+                const newSettings = { ...soundSettings, enabled: e.target.checked };
+                setSoundSettings(newSettings);
+                if (e.target.checked) {
+                  soundService.playMove(); // Test sound
+                }
+              }}
+              style={{
+                width: '20px',
+                height: '20px',
+                cursor: 'pointer',
+                accentColor: '#d4af37'
+              }}
+            />
+          </label>
+
+          {/* Volume Slider */}
+          {soundSettings.enabled && (
+            <div style={{
+              padding: '16px',
+              background: 'var(--color-background)',
+              border: '1px solid var(--color-border)',
+              borderRadius: '8px'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '12px'
+              }}>
+                <label style={{
+                  color: 'var(--color-text-primary)',
+                  fontSize: '14px',
+                  fontWeight: '600'
+                }}>
+                  Volume
+                </label>
+                <span style={{
+                  color: '#d4af37',
+                  fontSize: '14px',
+                  fontWeight: '600'
+                }}>
+                  {Math.round(soundSettings.volume * 100)}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={soundSettings.volume * 100}
+                onChange={(e) => {
+                  const volume = e.target.value / 100;
+                  const newSettings = { ...soundSettings, volume };
+                  setSoundSettings(newSettings);
+                }}
+                onMouseUp={() => soundService.playMove()} // Test sound on release
+                style={{
+                  width: '100%',
+                  height: '6px',
+                  borderRadius: '3px',
+                  background: `linear-gradient(to right, #d4af37 0%, #d4af37 ${soundSettings.volume * 100}%, #333 ${soundSettings.volume * 100}%, #333 100%)`,
+                  outline: 'none',
+                  cursor: 'pointer',
+                  accentColor: '#d4af37'
+                }}
+              />
+            </div>
+          )}
         </div>
 
         {/* Buttons */}

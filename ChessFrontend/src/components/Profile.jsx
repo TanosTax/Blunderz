@@ -1,50 +1,135 @@
 import { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Card, 
-  CardContent, 
-  Typography, 
-  Grid, 
-  Chip,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  IconButton,
-  Divider,
-  CircularProgress
-} from '@mui/material';
-import { 
-  EmojiEvents as TrophyIcon,
-  Close as CloseIcon,
-  SportsEsports as GameIcon
-} from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../i18n/LanguageContext';
 import apiService from '../services/apiService';
-import { theme } from '../theme';
+import signalRService from '../services/signalRService';
+import '../styles/profile-coach-responsive.css';
 
 export default function Profile({ userId }) {
+  const navigate = useNavigate();
+  const { t } = useLanguage();
   const [user, setUser] = useState(null);
-  const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedGame, setSelectedGame] = useState(null);
-  const [gameDetailsOpen, setGameDetailsOpen] = useState(false);
+  const [friends, setFriends] = useState([]);
+  const [friendRequests, setFriendRequests] = useState({ incoming: [], outgoing: [] });
 
   useEffect(() => {
     loadUserData();
+
+    const setupSignalR = async () => {
+      try {
+        await signalRService.connect();
+        console.log('Profile.jsx: SignalR connected');
+        
+        // Small delay to ensure connection is ready
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        await signalRService.joinUserChannel(userId);
+        console.log('Profile.jsx: Joined user channel', userId);
+
+        // Setup event listeners with functional updates (like useChess.js)
+        signalRService.onFriendRequestReceived((data) => {
+          console.log('Profile.jsx: Friend request received:', data);
+          setFriendRequests(prev => ({
+            ...prev,
+            incoming: [...prev.incoming, {
+              id: data.id,
+              from: {
+                id: data.fromUserId,
+                username: data.fromUsername,
+                elo: data.fromElo || 1500
+              },
+              createdAt: data.createdAt
+            }]
+          }));
+        });
+
+        signalRService.onFriendRequestSent((data) => {
+          console.log('Profile.jsx: Friend request sent:', data);
+          setFriendRequests(prev => ({
+            ...prev,
+            outgoing: [...prev.outgoing, {
+              id: data.id,
+              to: {
+                id: data.toUserId,
+                username: data.toUsername,
+                elo: data.toElo || 1500
+              },
+              createdAt: data.createdAt || new Date().toISOString()
+            }]
+          }));
+        });
+
+        signalRService.onFriendRequestAccepted((data) => {
+          console.log('Profile.jsx: Friend request accepted event:', data);
+          
+          // Remove from requests
+          setFriendRequests(prev => ({
+            incoming: prev.incoming.filter(r => r.id !== data.friendshipId),
+            outgoing: prev.outgoing.filter(r => r.id !== data.friendshipId)
+          }));
+          
+          // Add to friends
+          setFriends(prev => {
+            if (prev.some(f => f.friendshipId === data.friendshipId)) {
+              console.log('Profile.jsx: Friend already exists, skipping');
+              return prev;
+            }
+            
+            const newFriend = {
+              friendshipId: data.friendshipId,
+              friend: {
+                id: data.friendId,
+                username: data.friendUsername,
+                elo: data.friendElo,
+                gamesPlayed: 0
+              }
+            };
+            console.log('Profile.jsx: Adding friend:', newFriend);
+            return [...prev, newFriend];
+          });
+        });
+
+        signalRService.onFriendRequestRejected((data) => {
+          console.log('Profile.jsx: Friend request rejected:', data);
+          setFriendRequests(prev => ({
+            incoming: prev.incoming.filter(r => r.id !== data.friendshipId),
+            outgoing: prev.outgoing.filter(r => r.id !== data.friendshipId)
+          }));
+        });
+
+        signalRService.onFriendRemoved((data) => {
+          console.log('Profile.jsx: Friend removed event received:', data);
+          setFriends(prev => {
+            const filtered = prev.filter(f => f.friendshipId !== data.friendshipId);
+            console.log('Profile.jsx: Friends before removal:', prev.length);
+            console.log('Profile.jsx: Friends after removal:', filtered.length);
+            return filtered;
+          });
+        });
+      } catch (error) {
+        console.error('Failed to setup SignalR:', error);
+      }
+    };
+
+    setupSignalR();
+
+    return () => {
+      signalRService.leaveUserChannel(userId);
+    };
   }, [userId]);
 
   const loadUserData = async () => {
     try {
-      const [userData, userGames] = await Promise.all([
+      const [userData, friendsData, requestsData] = await Promise.all([
         apiService.getUser(userId),
-        apiService.getUserGames(userId)
+        apiService.getFriends(userId),
+        apiService.getFriendRequests(userId)
       ]);
 
       setUser(userData);
-      setGames(userGames);
+      setFriends(friendsData);
+      setFriendRequests(requestsData);
     } catch (error) {
       console.error('Failed to load user data:', error);
     } finally {
@@ -52,36 +137,48 @@ export default function Profile({ userId }) {
     }
   };
 
-  const handleGameClick = async (game) => {
+  const handleAcceptRequest = async (friendshipId) => {
     try {
-      const fullGame = await apiService.getGame(game.id);
-      setSelectedGame(fullGame);
-      setGameDetailsOpen(true);
+      await signalRService.acceptFriendRequest(friendshipId, userId);
+      // Real-time update will be handled by SignalR event
     } catch (error) {
-      console.error('Failed to load game details:', error);
+      console.error('Failed to accept request:', error);
     }
   };
 
-  const handleCloseDetails = () => {
-    setGameDetailsOpen(false);
-    setSelectedGame(null);
+  const handleRejectRequest = async (friendshipId) => {
+    try {
+      await signalRService.rejectFriendRequest(friendshipId, userId);
+      // Real-time update will be handled by SignalR event
+    } catch (error) {
+      console.error('Failed to reject request:', error);
+    }
+  };
+
+  const handleRemoveFriend = async (friendshipId) => {
+    if (!confirm(t('profile.removeFriend') + '?')) return;
+    
+    try {
+      await signalRService.removeFriend(friendshipId, userId);
+      // Real-time update will be handled by SignalR event
+    } catch (error) {
+      console.error('Failed to remove friend:', error);
+    }
   };
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
+      <div style={{ textAlign: 'center', padding: '50px', color: '#888' }}>
+        {t('common.loading')}
+      </div>
     );
   }
 
   if (!user) {
     return (
-      <Box textAlign="center" py={6}>
-        <Typography variant="h6" color="text.secondary">
-          User not found
-        </Typography>
-      </Box>
+      <div style={{ textAlign: 'center', padding: '50px', color: '#888' }}>
+        User not found
+      </div>
     );
   }
 
@@ -89,331 +186,199 @@ export default function Profile({ userId }) {
     ? ((user.wins / user.gamesPlayed) * 100).toFixed(1) 
     : 0;
 
-  const completedGames = games.filter(g => g.status === 2);
-
   return (
-    <Box maxWidth="900px" margin="0 auto" p={3}>
-      {/* User Stats Card */}
-      <Card 
-        elevation={0}
-        sx={{ 
-          mb: 4,
-          bgcolor: theme.colors.surface,
-          border: `1px solid ${theme.colors.borderGold}`,
-          borderRadius: theme.borderRadius.large,
-          boxShadow: theme.shadows.glow
-        }}
-      >
-        <CardContent sx={{ p: 4 }}>
-          <Box display="flex" alignItems="center" mb={3}>
-            <TrophyIcon sx={{ fontSize: 40, color: theme.colors.accent, mr: 2 }} />
-            <Typography variant="h4" component="h1" sx={{ color: theme.colors.textPrimary }}>
-              {user.username}
-            </Typography>
-          </Box>
+    <div className="profile-container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
+      {/* User Stats */}
+      <div className="card" style={{ marginBottom: '20px' }}>
+        <h2 style={{ color: '#d4af37', margin: '0 0 20px 0' }}>
+          👤 {user.username}
+        </h2>
 
-          <Grid container spacing={3}>
-            <Grid item xs={6} sm={4} md={2}>
-              <Box textAlign="center">
-                <Typography variant="h3" sx={{ color: theme.colors.accent, fontWeight: 'bold' }}>
-                  {user.elo}
-                </Typography>
-                <Typography variant="body2" sx={{ color: theme.colors.textSecondary }}>
-                  Rating
-                </Typography>
-              </Box>
-            </Grid>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
+          <div className="stat-card">
+            <div className="stat-label">{t('profile.bulletRating')}</div>
+            <div className="stat-value" style={{ color: '#d4af37' }}>{user.bulletRating}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">{t('profile.blitzRating')}</div>
+            <div className="stat-value" style={{ color: '#d4af37' }}>{user.blitzRating}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">{t('profile.rapidRating')}</div>
+            <div className="stat-value" style={{ color: '#d4af37' }}>{user.rapidRating}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">{t('profile.classicalRating')}</div>
+            <div className="stat-value" style={{ color: '#d4af37' }}>{user.classicalRating}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">{t('profile.puzzleRating')}</div>
+            <div className="stat-value" style={{ color: '#d4af37' }}>{user.puzzleRating}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">{t('profile.gamesPlayed')}</div>
+            <div className="stat-value">{user.gamesPlayed}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">{t('profile.wins')}</div>
+            <div className="stat-value" style={{ color: '#4CAF50' }}>{user.wins}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">{t('profile.losses')}</div>
+            <div className="stat-value" style={{ color: '#f44336' }}>{user.losses}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">{t('profile.draws')}</div>
+            <div className="stat-value" style={{ color: '#FFC107' }}>{user.draws}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">{t('profile.winRate')}</div>
+            <div className="stat-value">{winRate}%</div>
+          </div>
+        </div>
+      </div>
 
-            <Grid item xs={6} sm={4} md={2}>
-              <Box textAlign="center">
-                <Typography variant="h3" sx={{ color: theme.colors.textPrimary, fontWeight: 'bold' }}>
-                  {user.gamesPlayed}
-                </Typography>
-                <Typography variant="body2" sx={{ color: theme.colors.textSecondary }}>
-                  Games
-                </Typography>
-              </Box>
-            </Grid>
-
-            <Grid item xs={6} sm={4} md={2}>
-              <Box textAlign="center">
-                <Typography variant="h3" sx={{ color: theme.colors.accent, fontWeight: 'bold' }}>
-                  {user.wins}
-                </Typography>
-                <Typography variant="body2" sx={{ color: theme.colors.textSecondary }}>
-                  Wins
-                </Typography>
-              </Box>
-            </Grid>
-
-            <Grid item xs={6} sm={4} md={2}>
-              <Box textAlign="center">
-                <Typography variant="h3" sx={{ color: theme.colors.error, fontWeight: 'bold' }}>
-                  {user.losses}
-                </Typography>
-                <Typography variant="body2" sx={{ color: theme.colors.textSecondary }}>
-                  Losses
-                </Typography>
-              </Box>
-            </Grid>
-
-            <Grid item xs={6} sm={4} md={2}>
-              <Box textAlign="center">
-                <Typography variant="h3" sx={{ color: theme.colors.warning, fontWeight: 'bold' }}>
-                  {user.draws}
-                </Typography>
-                <Typography variant="body2" sx={{ color: theme.colors.textSecondary }}>
-                  Draws
-                </Typography>
-              </Box>
-            </Grid>
-
-            <Grid item xs={6} sm={4} md={2}>
-              <Box textAlign="center">
-                <Typography variant="h3" sx={{ color: theme.colors.textPrimary, fontWeight: 'bold' }}>
-                  {winRate}%
-                </Typography>
-                <Typography variant="body2" sx={{ color: theme.colors.textSecondary }}>
-                  Win Rate
-                </Typography>
-              </Box>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
-
-      {/* Games History */}
-      <Card 
-        elevation={0}
-        sx={{ 
-          bgcolor: theme.colors.surface,
-          border: `1px solid ${theme.colors.border}`,
-          borderRadius: theme.borderRadius.large
-        }}
-      >
-        <CardContent>
-          <Box display="flex" alignItems="center" mb={2}>
-            <GameIcon sx={{ mr: 1, color: theme.colors.accent }} />
-            <Typography variant="h5" component="h2" sx={{ color: theme.colors.textPrimary }}>
-              Game History
-            </Typography>
-          </Box>
-
-          {completedGames.length === 0 ? (
-            <Box textAlign="center" py={4}>
-              <Typography variant="body1" sx={{ color: theme.colors.textSecondary }}>
-                No completed games yet
-              </Typography>
-            </Box>
+      <div className="profile-friends-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        {/* Friends */}
+        <div className="card">
+          <h3 style={{ color: '#d4af37', marginBottom: '16px' }}>
+            {t('profile.friends')} ({friends.length})
+          </h3>
+          {friends.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#888', padding: '20px' }}>
+              {t('profile.noFriends')}
+            </div>
           ) : (
-            <List sx={{ p: 0 }}>
-              {completedGames.map((game, index) => {
-                const isWhite = game.whitePlayerId === userId;
-                const opponent = isWhite ? game.blackPlayer : game.whitePlayer;
-                
-                let resultText = 'Draw';
-                let chipColor = theme.colors.warning;
-                
-                if (game.winnerId === userId) {
-                  resultText = 'Win';
-                  chipColor = theme.colors.accent;
-                } else if (game.winnerId !== null) {
-                  resultText = 'Loss';
-                  chipColor = theme.colors.error;
-                }
-
-                const gameDate = new Date(game.completedAt || game.createdAt);
-                const dateStr = gameDate.toLocaleDateString('ru-RU', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric'
-                });
-
-                return (
-                  <Box key={game.id}>
-                    {index > 0 && <Divider sx={{ borderColor: theme.colors.border }} />}
-                    <ListItem disablePadding>
-                      <ListItemButton 
-                        onClick={() => handleGameClick(game)}
-                        sx={{
-                          '&:hover': {
-                            bgcolor: theme.colors.surfaceLight
-                          }
-                        }}
-                      >
-                        <ListItemText
-                          primary={
-                            <Box display="flex" alignItems="center" gap={1}>
-                              <Typography variant="body1" sx={{ fontWeight: 500, color: theme.colors.textPrimary }}>
-                                vs {opponent?.username || 'Unknown'}
-                              </Typography>
-                              <Chip 
-                                label={resultText} 
-                                size="small"
-                                sx={{
-                                  bgcolor: chipColor,
-                                  color: resultText === 'Win' ? '#000' : '#fff',
-                                  fontWeight: 'bold'
-                                }}
-                              />
-                            </Box>
-                          }
-                          secondary={
-                            <Box display="flex" gap={2} mt={0.5}>
-                              <Typography variant="body2" sx={{ color: theme.colors.textSecondary }}>
-                                {isWhite ? '⚪ White' : '⚫ Black'}
-                              </Typography>
-                              <Typography variant="body2" sx={{ color: theme.colors.textSecondary }}>
-                                {game.timeControl}
-                              </Typography>
-                              <Typography variant="body2" sx={{ color: theme.colors.textSecondary }}>
-                                {dateStr}
-                              </Typography>
-                            </Box>
-                          }
-                        />
-                      </ListItemButton>
-                    </ListItem>
-                  </Box>
-                );
-              })}
-            </List>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Game Details Dialog */}
-      <Dialog 
-        open={gameDetailsOpen} 
-        onClose={handleCloseDetails}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            bgcolor: theme.colors.surface,
-            border: `1px solid ${theme.colors.borderGold}`,
-            borderRadius: theme.borderRadius.large
-          }
-        }}
-      >
-        <DialogTitle sx={{ bgcolor: theme.colors.surfaceLight }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6" sx={{ color: theme.colors.textPrimary }}>Game Details</Typography>
-            <IconButton onClick={handleCloseDetails} size="small" sx={{ color: theme.colors.accent }}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          {selectedGame && (
-            <Box>
-              <Grid container spacing={2} mb={3}>
-                <Grid item xs={6}>
-                  <Typography variant="subtitle2" sx={{ color: theme.colors.textSecondary }}>
-                    White
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 500, color: theme.colors.textPrimary }}>
-                    {selectedGame.whitePlayer?.username}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: theme.colors.accent }}>
-                    {selectedGame.whitePlayer?.elo} rating
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="subtitle2" sx={{ color: theme.colors.textSecondary }}>
-                    Black
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 500, color: theme.colors.textPrimary }}>
-                    {selectedGame.blackPlayer?.username}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: theme.colors.accent }}>
-                    {selectedGame.blackPlayer?.elo} rating
-                  </Typography>
-                </Grid>
-              </Grid>
-
-              <Divider sx={{ my: 2, borderColor: theme.colors.border }} />
-
-              <Box mb={2}>
-                <Typography variant="subtitle2" sx={{ color: theme.colors.textSecondary }} gutterBottom>
-                  Result
-                </Typography>
-                <Typography variant="body1" sx={{ color: theme.colors.textPrimary }}>
-                  {selectedGame.result === 0 && '1-0 (White wins)'}
-                  {selectedGame.result === 1 && '0-1 (Black wins)'}
-                  {selectedGame.result === 2 && '½-½ (Draw)'}
-                  {selectedGame.result === 3 && '½-½ (Stalemate)'}
-                  {selectedGame.result === 4 && 'Timeout'}
-                  {selectedGame.result === 5 && 'Resignation'}
-                </Typography>
-              </Box>
-
-              <Box mb={2}>
-                <Typography variant="subtitle2" sx={{ color: theme.colors.textSecondary }} gutterBottom>
-                  Time Control
-                </Typography>
-                <Typography variant="body1" sx={{ color: theme.colors.textPrimary }}>
-                  {selectedGame.timeControl}
-                </Typography>
-              </Box>
-
-              <Box mb={2}>
-                <Typography variant="subtitle2" sx={{ color: theme.colors.textSecondary }} gutterBottom>
-                  Moves
-                </Typography>
-                <Typography variant="body1" sx={{ color: theme.colors.textPrimary }}>
-                  {selectedGame.moves?.length || 0} moves
-                </Typography>
-              </Box>
-
-              {selectedGame.moves && selectedGame.moves.length > 0 && (
-                <Box>
-                  <Typography variant="subtitle2" sx={{ color: theme.colors.textSecondary }} gutterBottom>
-                    Move History
-                  </Typography>
-                  <Box 
-                    sx={{ 
-                      maxHeight: '200px', 
-                      overflowY: 'auto',
-                      bgcolor: theme.colors.primary,
-                      border: `1px solid ${theme.colors.border}`,
-                      p: 2,
-                      borderRadius: 1
+            <div style={{ display: 'grid', gap: '12px', maxHeight: '400px', overflowY: 'auto' }}>
+              {friends.map(({ friendshipId, friend }) => (
+                <div
+                  key={friendshipId}
+                  className="friend-card"
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '12px',
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '8px'
+                  }}
+                >
+                  <div
+                    onClick={() => navigate(`/user/${friend.id}`)}
+                    style={{ cursor: 'pointer', flex: 1 }}
+                  >
+                    <div style={{ color: '#fff', fontWeight: '500' }}>{friend.username}</div>
+                    <div style={{ color: '#888', fontSize: '14px' }}>
+                      {t('profile.ratings')}: {friend.elo}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleRemoveFriend(friendshipId)}
+                    className="btn-outline"
+                    style={{ 
+                      padding: '4px 12px', 
+                      fontSize: '12px',
+                      color: '#ff5722',
+                      borderColor: '#ff5722'
                     }}
                   >
-                    <Typography 
-                      variant="body2" 
-                      component="pre" 
-                      sx={{ 
-                        fontFamily: 'monospace', 
-                        m: 0,
-                        color: theme.colors.textPrimary
-                      }}
-                    >
-                      {selectedGame.moves
-                        .reduce((acc, move, idx) => {
-                          if (idx % 2 === 0) {
-                            acc.push(`${Math.floor(idx / 2) + 1}. ${move.san}`);
-                          } else {
-                            acc[acc.length - 1] += ` ${move.san}`;
-                          }
-                          return acc;
-                        }, [])
-                        .join('\n')}
-                    </Typography>
-                  </Box>
-                </Box>
-              )}
-
-              <Box mt={2}>
-                <Typography variant="caption" sx={{ color: theme.colors.textMuted }}>
-                  Game ID: {selectedGame.id}
-                </Typography>
-              </Box>
-            </Box>
+                    {t('profile.removeFriend')}
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
-        </DialogContent>
-      </Dialog>
-    </Box>
+        </div>
+
+        {/* Friend Requests */}
+        <div className="card">
+          <h3 style={{ color: '#d4af37', marginBottom: '16px' }}>
+            {t('profile.friendRequests') || 'Friend Requests'} ({friendRequests.incoming.length})
+          </h3>
+          {friendRequests.incoming.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#888', padding: '20px' }}>
+              {t('profile.noRequests') || 'No pending requests'}
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: '12px', maxHeight: '400px', overflowY: 'auto' }}>
+              {friendRequests.incoming.map((request) => (
+                <div
+                  key={request.id}
+                  style={{
+                    padding: '12px',
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '8px'
+                  }}
+                >
+                  <div
+                    onClick={() => navigate(`/user/${request.from.id}`)}
+                    style={{ cursor: 'pointer', marginBottom: '8px' }}
+                  >
+                    <div style={{ color: '#fff', fontWeight: '500' }}>{request.from.username}</div>
+                    <div style={{ color: '#888', fontSize: '14px' }}>
+                      {t('profile.ratings')}: {request.from.elo}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => handleAcceptRequest(request.id)}
+                      className="btn-primary"
+                      style={{ flex: 1, padding: '6px', fontSize: '14px' }}
+                    >
+                      {t('profile.acceptRequest')}
+                    </button>
+                    <button
+                      onClick={() => handleRejectRequest(request.id)}
+                      className="btn-outline"
+                      style={{ flex: 1, padding: '6px', fontSize: '14px' }}
+                    >
+                      {t('profile.rejectRequest')}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {friendRequests.outgoing.length > 0 && (
+            <>
+              <h4 style={{ color: '#888', marginTop: '20px', marginBottom: '12px', fontSize: '14px' }}>
+                {t('profile.sentRequests') || 'Sent Requests'} ({friendRequests.outgoing.length})
+              </h4>
+              <div style={{ display: 'grid', gap: '8px' }}>
+                {friendRequests.outgoing.map((request) => (
+                  <div
+                    key={request.id}
+                    onClick={() => navigate(`/user/${request.to.id}`)}
+                    style={{
+                      padding: '10px',
+                      background: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <div>
+                      <div style={{ color: '#fff', fontSize: '14px' }}>{request.to.username}</div>
+                      <div style={{ color: '#888', fontSize: '12px' }}>
+                        {t('profile.ratings')}: {request.to.elo}
+                      </div>
+                    </div>
+                    <span style={{ color: '#FFC107', fontSize: '12px' }}>
+                      {t('profile.pendingRequest')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

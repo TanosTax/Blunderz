@@ -6,6 +6,11 @@ public class EloCalculatorService : IEloCalculatorService
 {
     public (int newWhiteElo, int newBlackElo) CalculateNewRatings(int whiteElo, int blackElo, GameResult result)
     {
+        return CalculateNewRatings(whiteElo, blackElo, result, false, false);
+    }
+
+    public (int newWhiteElo, int newBlackElo) CalculateNewRatings(int whiteElo, int blackElo, GameResult result, bool whitePlayerBerserk, bool blackPlayerBerserk)
+    {
         // Expected scores
         double expectedWhite = 1.0 / (1.0 + Math.Pow(10, (blackElo - whiteElo) / 400.0));
         double expectedBlack = 1.0 / (1.0 + Math.Pow(10, (whiteElo - blackElo) / 400.0));
@@ -23,6 +28,12 @@ public class EloCalculatorService : IEloCalculatorService
         // K-factor based on rating (higher rating = more stable)
         int kFactorWhite = GetKFactorByRating(whiteElo);
         int kFactorBlack = GetKFactorByRating(blackElo);
+
+        // Double K-factor for berserk players (2x rating change)
+        if (whitePlayerBerserk)
+            kFactorWhite *= 2;
+        if (blackPlayerBerserk)
+            kFactorBlack *= 2;
 
         // Calculate new ratings
         int newWhiteElo = whiteElo + (int)Math.Round(kFactorWhite * (actualWhite - expectedWhite));

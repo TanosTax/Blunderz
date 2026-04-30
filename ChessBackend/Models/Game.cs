@@ -50,6 +50,13 @@ public class Game
     public bool WhitePlayerConnected { get; set; } = false;
     public bool BlackPlayerConnected { get; set; } = false;
     
+    // Berserk mode
+    public bool WhitePlayerBerserk { get; set; } = false;
+    public bool BlackPlayerBerserk { get; set; } = false;
+    
+    // Ranked/Unranked
+    public bool IsRanked { get; set; } = true; // true = ranked (affects rating), false = friendly
+    
     // Navigation properties
     public ICollection<Move> Moves { get; set; } = new List<Move>();
 }

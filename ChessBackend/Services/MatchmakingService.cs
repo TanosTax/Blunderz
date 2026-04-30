@@ -38,16 +38,16 @@ public class MatchmakingService : IMatchmakingService
             return existingGame;
         }
 
-        var minElo = user.Elo - eloRange;
-        var maxElo = user.Elo + eloRange;
+        var minElo = user.GetRating(timeControl) - eloRange;
+        var maxElo = user.GetRating(timeControl) + eloRange;
 
         // Ищем подходящего оппонента в очереди (НЕ включая текущего пользователя)
         var opponent = await _context.MatchmakingQueue
             .Include(mq => mq.User)
             .Where(mq => mq.UserId != userId &&
                          mq.TimeControl == timeControl &&
-                         mq.MinElo <= user.Elo &&
-                         mq.MaxElo >= user.Elo)
+                         mq.MinElo <= user.GetRating(timeControl) &&
+                         mq.MaxElo >= user.GetRating(timeControl))
             .OrderBy(mq => mq.CreatedAt)
             .FirstOrDefaultAsync();
 
@@ -131,8 +131,8 @@ public class MatchmakingService : IMatchmakingService
         var queueEntry = new MatchmakingQueue
         {
             UserId = userId,
-            MinElo = user.Elo - eloRange,
-            MaxElo = user.Elo + eloRange,
+            MinElo = user.GetRating(timeControl) - eloRange,
+            MaxElo = user.GetRating(timeControl) + eloRange,
             TimeControl = timeControl,
             CreatedAt = DateTime.UtcNow
         };

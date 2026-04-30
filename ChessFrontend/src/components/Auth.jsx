@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { GiChessKnight } from 'react-icons/gi';
 import apiService from '../services/apiService';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export default function Auth({ onAuthSuccess }) {
+  const { t } = useLanguage();
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -29,6 +31,9 @@ export default function Auth({ onAuthSuccess }) {
       localStorage.setItem('isAnonymous', userData.isAnonymous);
       
       onAuthSuccess(userData);
+      
+      // Redirect to home page
+      window.location.href = '/';
     } catch (err) {
       setError(err.message || 'Authentication failed');
     } finally {
@@ -48,10 +53,12 @@ export default function Auth({ onAuthSuccess }) {
       localStorage.setItem('username', userData.username);
       localStorage.setItem('isAnonymous', 'true');
       
-      // Передаем флаг, что это гость и нужно сразу в матчмейкинг
-      onAuthSuccess({ ...userData, isGuest: true });
+      onAuthSuccess({ ...userData, isGuest: false }); // Don't auto-redirect
+      
+      // Redirect to home page instead of /play
+      window.location.href = '/';
     } catch (err) {
-      setError('Failed to create guest account');
+      setError(err.message || 'Failed to create guest account');
     } finally {
       setLoading(false);
     }
@@ -116,7 +123,7 @@ export default function Auth({ onAuthSuccess }) {
             Blunderz
           </h1>
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '15px' }}>
-            {isLogin ? 'Welcome back!' : 'Create your account'}
+            {isLogin ? t('auth.welcomeBack') : t('auth.createAccount')}
           </p>
         </div>
 
@@ -143,7 +150,7 @@ export default function Auth({ onAuthSuccess }) {
               transition: 'all 0.3s ease'
             }}
           >
-            Login
+            {t('auth.login')}
           </button>
           <button
             onClick={() => setIsLogin(false)}
@@ -159,7 +166,7 @@ export default function Auth({ onAuthSuccess }) {
               transition: 'all 0.3s ease'
             }}
           >
-            Register
+            {t('auth.register')}
           </button>
         </div>
 
@@ -173,7 +180,7 @@ export default function Auth({ onAuthSuccess }) {
               fontSize: '14px',
               fontWeight: '500'
             }}>
-              Username
+              {t('auth.username')}
             </label>
             <input
               type="text"
@@ -204,7 +211,7 @@ export default function Auth({ onAuthSuccess }) {
                 fontSize: '14px',
                 fontWeight: '500'
               }}>
-                Email (optional)
+                {t('auth.email')}
               </label>
               <input
                 type="email"
@@ -234,7 +241,7 @@ export default function Auth({ onAuthSuccess }) {
               fontSize: '14px',
               fontWeight: '500'
             }}>
-              Password
+              {t('auth.password')}
             </label>
             <input
               type="password"
@@ -280,7 +287,7 @@ export default function Auth({ onAuthSuccess }) {
               marginBottom: '16px'
             }}
           >
-            {loading ? 'Loading...' : (isLogin ? 'Login' : 'Create Account')}
+            {loading ? t('auth.loading') : (isLogin ? t('auth.loginButton') : t('auth.registerButton'))}
           </button>
         </form>
 
@@ -292,7 +299,7 @@ export default function Auth({ onAuthSuccess }) {
           margin: '24px 0'
         }}>
           <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }} />
-          <span style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>OR</span>
+          <span style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>{t('common.or')}</span>
           <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }} />
         </div>
 
@@ -306,7 +313,7 @@ export default function Auth({ onAuthSuccess }) {
             padding: '14px'
           }}
         >
-          🎭 Play as Guest
+          🎭 {t('auth.playAsGuest')}
         </button>
 
         <p style={{
@@ -315,7 +322,7 @@ export default function Auth({ onAuthSuccess }) {
           color: 'var(--color-text-muted)',
           fontSize: '13px'
         }}>
-          Guest accounts can play but won't save progress
+          {t('auth.guestNote')}
         </p>
       </div>
     </div>

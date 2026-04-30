@@ -25,6 +25,14 @@ builder.Services.AddDbContext<ChessDbContext>(options =>
 builder.Services.AddScoped<IEloCalculatorService, EloCalculatorService>();
 builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<IMatchmakingService, MatchmakingService>();
+builder.Services.AddScoped<IPuzzleService, PuzzleService>();
+builder.Services.AddSingleton<IStockfishService, StockfishService>();
+builder.Services.AddScoped<AICoachService>();
+builder.Services.AddHttpClient<AICoachService>()
+    .ConfigureHttpClient(client =>
+    {
+        client.Timeout = TimeSpan.FromMinutes(5); // 5 minutes for AI analysis
+    });
 builder.Services.AddHostedService<DisconnectTimeoutService>();
 
 // Configure CORS for Telegram Mini App

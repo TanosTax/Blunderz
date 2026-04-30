@@ -34,6 +34,8 @@ Blunderz — это веб-приложение для игры в шахмат�
 - 🎨 Настраиваемые темы доски
 - 🔄 Автоматическое переподключение при разрыве связи
 - 👻 Гостевой режим (игра без регистрации)
+- 🤖 AI Coach — анализ партий с помощью Ollama (локально, бесплатно)
+- 📈 Stockfish анализ — оценка ходов и точность игры
 
 ## 🚀 Быстрый старт
 
@@ -54,6 +56,11 @@ cd Blunderz
 # Настроить переменные окружения
 cp .env.example .env
 # Отредактировать .env файл с вашими настройками
+
+# ВАЖНО: Для AI Coach нужен Ollama
+# Установить Ollama: https://ollama.ai/download
+# Запустить: ollama serve
+# Скачать модель: ollama pull llama3.2
 ```
 
 ### Запуск Backend
@@ -148,6 +155,9 @@ DELETE /api/matchmaking/leave   - Выйти из очереди
 
 GET    /api/games/{id}          - Получить игру
 GET    /api/games/active        - Активные игры пользователя
+
+POST   /api/analysis/game/{id}  - Stockfish анализ партии
+POST   /api/aicoach/analyze/{id} - AI Coach анализ (Ollama)
 ```
 
 ### SignalR Hub (`/hubs/chess`)
@@ -186,6 +196,8 @@ connection.on('OpponentDisconnected', () => { ... })
 - **MatchmakingService** — поиск соперников, создание игр
 - **DisconnectTimeoutService** — обработка отключений игроков
 - **RatingService** — расчет Elo рейтинга
+- **StockfishService** — анализ позиций и партий
+- **AICoachService** — персонализированный анализ через Ollama (llama3.2)
 
 ### Frontend Architecture
 
@@ -209,6 +221,9 @@ connection.on('OpponentDisconnected', () => { ... })
 ConnectionStrings__Default=Host=localhost;Database=chessdb;Username=postgres;Password=yourpassword
 JWT_SECRET=your-secret-key-min-32-characters
 FRONTEND_URL=http://localhost:5173
+
+# Ollama (для AI Coach, локально)
+Ollama__Url=http://localhost:11434
 
 # Frontend (vite)
 VITE_API_URL=http://localhost:5049

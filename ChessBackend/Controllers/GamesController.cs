@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
 using ChessBackend.Data;
 using ChessBackend.Models;
+using ChessBackend.Hubs;
 
 namespace ChessBackend.Controllers;
 
@@ -11,11 +13,13 @@ public class GamesController : ControllerBase
 {
     private readonly ChessDbContext _context;
     private readonly ILogger<GamesController> _logger;
+    private readonly IHubContext<ChessHub> _hubContext;
 
-    public GamesController(ChessDbContext context, ILogger<GamesController> logger)
+    public GamesController(ChessDbContext context, ILogger<GamesController> logger, IHubContext<ChessHub> hubContext)
     {
         _context = context;
         _logger = logger;
+        _hubContext = hubContext;
     }
 
     [HttpGet("{id}")]
@@ -34,6 +38,26 @@ public class GamesController : ControllerBase
         }
 
         return game;
+    }
+
+    [HttpGet("{id}/chat")]
+    public async Task<ActionResult<List<object>>> GetGameChat(Guid id)
+    {
+        var messages = await _context.ChatMessages
+            .Include(cm => cm.Player)
+            .Where(cm => cm.GameId == id)
+            .OrderBy(cm => cm.CreatedAt)
+            .Select(cm => new
+            {
+                cm.Id,
+                cm.PlayerId,
+                PlayerUsername = cm.Player.Username,
+                cm.Message,
+                cm.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(messages);
     }
 
     [HttpPost]
@@ -73,6 +97,134 @@ public class GamesController : ControllerBase
             .ToListAsync();
 
         return games;
+    }
+
+    [HttpGet("user/{userId}/history")]
+    public async Task<ActionResult<object>> GetUserGameHistory(
+        int userId,
+        [FromQuery] string? result = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        var query = _context.Games
+            .Include(g => g.WhitePlayer)
+            .Include(g => g.BlackPlayer)
+            .Where(g => (g.WhitePlayerId == userId || g.BlackPlayerId == userId) 
+                     && g.Status == GameStatus.Completed);
+
+        // Filter by result
+        if (!string.IsNullOrEmpty(result))
+        {
+            switch (result.ToLower())
+            {
+                case "win":
+                    query = query.Where(g => g.WinnerId == userId);
+                    break;
+                case "loss":
+                    query = query.Where(g => g.WinnerId != null && g.WinnerId != userId);
+                    break;
+                case "draw":
+                    query = query.Where(g => g.Result == GameResult.Draw || g.Result == GameResult.Stalemate);
+                    break;
+            }
+        }
+
+        var totalGames = await query.CountAsync();
+        var totalPages = (int)Math.Ceiling(totalGames / (double)pageSize);
+
+        var games = await query
+            .OrderByDescending(g => g.CompletedAt ?? g.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(g => new
+            {
+                g.Id,
+                g.WhitePlayerId,
+                WhitePlayer = new { g.WhitePlayer.Id, g.WhitePlayer.Username, g.WhitePlayer.Elo },
+                g.BlackPlayerId,
+                BlackPlayer = new { g.BlackPlayer.Id, g.BlackPlayer.Username, g.BlackPlayer.Elo },
+                g.Result,
+                g.WinnerId,
+                g.TimeControl,
+                g.CreatedAt,
+                g.CompletedAt,
+                IsWin = g.WinnerId == userId,
+                IsLoss = g.WinnerId != null && g.WinnerId != userId,
+                IsDraw = g.Result == GameResult.Draw || g.Result == GameResult.Stalemate,
+                OpponentId = g.WhitePlayerId == userId ? g.BlackPlayerId : g.WhitePlayerId,
+                OpponentUsername = g.WhitePlayerId == userId ? g.BlackPlayer.Username : g.WhitePlayer.Username,
+                OpponentElo = g.WhitePlayerId == userId ? g.BlackPlayer.Elo : g.WhitePlayer.Elo,
+                PlayerColor = g.WhitePlayerId == userId ? "white" : "black"
+            })
+            .ToListAsync();
+
+        return Ok(new
+        {
+            games,
+            pagination = new
+            {
+                currentPage = page,
+                pageSize,
+                totalPages,
+                totalGames
+            }
+        });
+    }
+
+    [HttpGet("active")]
+    public async Task<ActionResult<List<object>>> GetActiveGames([FromQuery] int limit = 20)
+    {
+        // Only show games that were started in the last hour (to avoid showing abandoned games)
+        // Use CreatedAt if StartedAt is null
+        var oneHourAgo = DateTime.UtcNow.AddHours(-1);
+        
+        var games = await _context.Games
+            .Include(g => g.WhitePlayer)
+            .Include(g => g.BlackPlayer)
+            .Include(g => g.Moves) // Added to get move count
+            .Where(g => g.Status == GameStatus.Active && 
+                       (g.StartedAt == null || g.StartedAt > oneHourAgo))
+            .OrderByDescending(g => g.StartedAt ?? g.CreatedAt)
+            .Take(limit)
+            .Select(g => new
+            {
+                id = g.Id,
+                whitePlayer = new { id = g.WhitePlayer.Id, username = g.WhitePlayer.Username, elo = g.WhitePlayer.Elo },
+                blackPlayer = new { id = g.BlackPlayer.Id, username = g.BlackPlayer.Username, elo = g.BlackPlayer.Elo },
+                timeControl = g.TimeControl,
+                startedAt = g.StartedAt ?? g.CreatedAt,
+                moveCount = g.Moves.Count,
+                currentFen = g.FEN
+            })
+            .ToListAsync();
+
+        return Ok(games);
+    }
+
+    [HttpPost("cleanup-abandoned")]
+    public async Task<ActionResult<object>> CleanupAbandonedGames()
+    {
+        var oneHourAgo = DateTime.UtcNow.AddHours(-1);
+        
+        var abandonedGames = await _context.Games
+            .Where(g => g.Status == GameStatus.Active && 
+                       (g.StartedAt.HasValue ? g.StartedAt < oneHourAgo : g.CreatedAt < oneHourAgo))
+            .ToListAsync();
+
+        foreach (var game in abandonedGames)
+        {
+            game.Status = GameStatus.Abandoned;
+        }
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation($"Cleaned up {abandonedGames.Count} abandoned games");
+
+        return Ok(new
+        {
+            cleanedCount = abandonedGames.Count,
+            message = $"Marked {abandonedGames.Count} games as abandoned"
+        });
     }
 
     [HttpPost("{id}/start")]
@@ -128,6 +280,8 @@ public class GamesController : ControllerBase
         // Store old Elo for response
         var oldWhiteElo = whitePlayer.Elo;
         var oldBlackElo = blackPlayer.Elo;
+        var newWhiteElo = oldWhiteElo;
+        var newBlackElo = oldBlackElo;
 
         whitePlayer.GamesPlayed++;
         blackPlayer.GamesPlayed++;
@@ -149,24 +303,66 @@ public class GamesController : ControllerBase
                 break;
         }
 
-        // Update Elo ratings
-        var eloResult = dto.Result switch
+        // Update Elo ratings only for ranked games
+        if (game.IsRanked)
         {
-            GameResult.WhiteWin => Interfaces.GameResult.WhiteWin,
-            GameResult.BlackWin => Interfaces.GameResult.BlackWin,
-            _ => Interfaces.GameResult.Draw
-        };
+            var eloResult = dto.Result switch
+            {
+                GameResult.WhiteWin => Interfaces.GameResult.WhiteWin,
+                GameResult.BlackWin => Interfaces.GameResult.BlackWin,
+                _ => Interfaces.GameResult.Draw
+            };
 
-        var eloCalculator = HttpContext.RequestServices.GetRequiredService<Interfaces.IEloCalculatorService>();
-        var (newWhiteElo, newBlackElo) = eloCalculator.CalculateNewRatings(
-            whitePlayer.Elo, blackPlayer.Elo, eloResult);
+            var eloCalculator = HttpContext.RequestServices.GetRequiredService<Interfaces.IEloCalculatorService>();
+            (newWhiteElo, newBlackElo) = eloCalculator.CalculateNewRatings(
+                whitePlayer.GetRating(game.TimeControl), blackPlayer.GetRating(game.TimeControl), eloResult, game.WhitePlayerBerserk, game.BlackPlayerBerserk);
 
-        whitePlayer.Elo = newWhiteElo;
-        blackPlayer.Elo = newBlackElo;
+            whitePlayer.SetRating(game.TimeControl, newWhiteElo);
+            blackPlayer.SetRating(game.TimeControl, newBlackElo);
+        }
 
         await _context.SaveChangesAsync();
 
         _logger.LogInformation($"Game {id} ended with result {dto.Result}. White Elo: {oldWhiteElo} -> {newWhiteElo}, Black Elo: {oldBlackElo} -> {newBlackElo}");
+
+        // Calculate Elo changes (0 if not ranked)
+        var whiteEloChange = game.IsRanked ? newWhiteElo - oldWhiteElo : 0;
+        var blackEloChange = game.IsRanked ? newBlackElo - oldBlackElo : 0;
+
+        // Determine result string for SignalR
+        string resultString = dto.Result switch
+        {
+            GameResult.WhiteWin => dto.WinnerId == whitePlayer.Id ? "timeout" : "checkmate",
+            GameResult.BlackWin => dto.WinnerId == blackPlayer.Id ? "timeout" : "checkmate",
+            GameResult.Draw => "draw",
+            GameResult.Stalemate => "draw",
+            GameResult.Resignation => "resignation",
+            GameResult.Timeout => "timeout",
+            _ => "unknown"
+        };
+
+        // Send SignalR notification to both players
+        await _hubContext.Clients.Group(id.ToString()).SendAsync("GameEnded", new
+        {
+            result = resultString,
+            winnerId = dto.WinnerId,
+            message = game.IsRanked ? $"Game ended: {resultString}" : $"Game ended: {resultString} (friendly match - no rating change)",
+            eloChanges = new
+            {
+                whitePlayerId = whitePlayer.Id,
+                whiteChange = whiteEloChange,
+                blackPlayerId = blackPlayer.Id,
+                blackChange = blackEloChange
+            }
+        });
+        
+        // Send SignalR notification to spectators
+        await _hubContext.Clients.Group($"spectator_{id}").SendAsync("GameEnded", new
+        {
+            result = resultString,
+            winnerId = dto.WinnerId,
+            message = $"Game ended: {resultString}"
+        });
 
         // Return game with Elo changes
         return Ok(new
@@ -178,10 +374,10 @@ public class GamesController : ControllerBase
                 blackPlayerId = blackPlayer.Id,
                 whiteOldElo = oldWhiteElo,
                 whiteNewElo = newWhiteElo,
-                whiteChange = newWhiteElo - oldWhiteElo,
+                whiteChange = whiteEloChange,
                 blackOldElo = oldBlackElo,
                 blackNewElo = newBlackElo,
-                blackChange = newBlackElo - oldBlackElo
+                blackChange = blackEloChange
             }
         });
     }
