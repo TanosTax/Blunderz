@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.SignalR;
 using ChessBackend.Data;
 using ChessBackend.Models;
 using ChessBackend.Interfaces;
+using ChessBackend.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChessBackend.Hubs;
@@ -10,12 +11,14 @@ public class ChessHub : Hub
 {
     private readonly ChessDbContext _context;
     private readonly ILogger<ChessHub> _logger;
+    private readonly TournamentService _tournamentService;
     private static readonly Dictionary<string, (string gameId, int playerId)> _connectionMap = new();
 
-    public ChessHub(ChessDbContext context, ILogger<ChessHub> logger)
+    public ChessHub(ChessDbContext context, ILogger<ChessHub> logger, TournamentService tournamentService)
     {
         _context = context;
         _logger = logger;
+        _tournamentService = tournamentService;
     }
 
     public async Task JoinGame(string gameId)
@@ -143,6 +146,16 @@ public class ChessHub : Hub
 
         await _context.SaveChangesAsync();
 
+        // Tournament hook (best-effort)
+        try
+        {
+            await _tournamentService.OnGameEndedAsync(gameGuid, winnerId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to process tournament end for ClaimVictory game {GameId}", gameId);
+        }
+
         var winnerEloChange = game.IsRanked ? winner.GetRating(game.TimeControl) - oldWinnerElo : 0;
         var loserEloChange = game.IsRanked ? loser.GetRating(game.TimeControl) - oldLoserElo : 0;
 
@@ -206,6 +219,16 @@ public class ChessHub : Hub
         game.BlackPlayer.Draws++;
 
         await _context.SaveChangesAsync();
+
+        // Tournament hook (best-effort) - draw has no winnerId
+        try
+        {
+            await _tournamentService.OnGameEndedAsync(gameGuid, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to process tournament end for OfferDrawAfterDisconnect game {GameId}", gameId);
+        }
 
         await Clients.Group(gameId).SendAsync("GameEnded", new
         {
@@ -285,6 +308,16 @@ public class ChessHub : Hub
         game.BlackPlayer.Draws++;
 
         await _context.SaveChangesAsync();
+
+        // Tournament hook (best-effort) - draw has no winnerId
+        try
+        {
+            await _tournamentService.OnGameEndedAsync(gameGuid, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to process tournament end for AcceptDraw game {GameId}", gameId);
+        }
 
         await Clients.Group(gameId).SendAsync("GameEnded", new
         {
@@ -580,6 +613,16 @@ public class ChessHub : Hub
         }
 
         await _context.SaveChangesAsync();
+
+        // Tournament hook (best-effort)
+        try
+        {
+            await _tournamentService.OnGameEndedAsync(gameGuid, winnerId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to process tournament end for ResignGame game {GameId}", gameId);
+        }
 
         // Calculate Elo changes only if game is ranked
         var winnerEloChange = game.IsRanked ? winner.GetRating(game.TimeControl) - oldWinnerElo : 0;

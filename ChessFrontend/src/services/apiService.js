@@ -392,6 +392,124 @@ class ApiService {
 
     return response.json();
   }
+
+  // Tournaments API
+  async createTournament(payload) {
+    const response = await fetch(`${API_URL}/tournaments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || 'Failed to create tournament');
+    }
+
+    return response.json();
+  }
+
+  async getTournament(tournamentId) {
+    const response = await fetch(`${API_URL}/tournaments/${tournamentId}`);
+    if (!response.ok) throw new Error('Tournament not found');
+    return response.json();
+  }
+
+  async getTournamentByRoom(roomName) {
+    const response = await fetch(`${API_URL}/tournaments/by-room/${encodeURIComponent(roomName)}`);
+    if (!response.ok) throw new Error('Tournament not found');
+    return response.json();
+  }
+
+  async joinTournament(tournamentId, userId, password = null) {
+    const response = await fetch(`${API_URL}/tournaments/${tournamentId}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, password })
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || 'Failed to join tournament');
+    }
+
+    return response.json();
+  }
+
+  async leaveTournament(tournamentId, userId) {
+    const response = await fetch(`${API_URL}/tournaments/${tournamentId}/leave`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId })
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || 'Failed to leave tournament');
+    }
+
+    return response.json();
+  }
+
+  async updateTournamentSeeds(tournamentId, creatorUserId, seeds) {
+    const response = await fetch(`${API_URL}/tournaments/${tournamentId}/seeds`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ creatorUserId, seeds })
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || 'Failed to update seeds');
+    }
+
+    return response.json();
+  }
+
+  async startTournament(tournamentId, creatorUserId) {
+    const response = await fetch(`${API_URL}/tournaments/${tournamentId}/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ creatorUserId })
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || 'Failed to start tournament');
+    }
+
+    return response.json();
+  }
+
+  async getActiveTournaments() {
+    const response = await fetch(`${API_URL}/tournaments/active`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch active tournaments');
+    }
+
+    return response.json();
+  }
+
+  async getCompletedTournaments(limit = 50) {
+    const response = await fetch(`${API_URL}/tournaments/completed?limit=${limit}`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch completed tournaments');
+    }
+
+    return response.json();
+  }
+
+  async getTournamentGames(tournamentId) {
+    const response = await fetch(`${API_URL}/tournaments/${tournamentId}/games`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch tournament games');
+    }
+
+    return response.json();
+  }
 }
 
 export default new ApiService();

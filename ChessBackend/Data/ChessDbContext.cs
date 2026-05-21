@@ -19,6 +19,9 @@ public class ChessDbContext : DbContext
     public DbSet<Challenge> Challenges { get; set; }
     public DbSet<Puzzle> Puzzles { get; set; }
     public DbSet<UserPuzzleAttempt> UserPuzzleAttempts { get; set; }
+    public DbSet<Tournament> Tournaments { get; set; }
+    public DbSet<TournamentParticipant> TournamentParticipants { get; set; }
+    public DbSet<TournamentMatch> TournamentMatches { get; set; }
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -30,6 +33,51 @@ public class ChessDbContext : DbContext
             entity.HasIndex(u => u.TelegramId).IsUnique();
             entity.HasIndex(u => u.Elo);
             entity.HasIndex(u => u.Username);
+        });
+
+        // Tournament configuration
+        modelBuilder.Entity<Tournament>(entity =>
+        {
+            entity.HasIndex(t => t.RoomName).IsUnique();
+            entity.HasIndex(t => t.Status);
+            entity.HasIndex(t => t.CreatedAt);
+
+            entity.HasOne(t => t.CreatorUser)
+                .WithMany()
+                .HasForeignKey(t => t.CreatorUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<TournamentParticipant>(entity =>
+        {
+            entity.HasIndex(tp => new { tp.TournamentId, tp.UserId }).IsUnique();
+            entity.HasIndex(tp => new { tp.TournamentId, tp.Seed });
+
+            entity.HasOne(tp => tp.Tournament)
+                .WithMany(t => t.Participants)
+                .HasForeignKey(tp => tp.TournamentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(tp => tp.User)
+                .WithMany()
+                .HasForeignKey(tp => tp.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<TournamentMatch>(entity =>
+        {
+            entity.HasIndex(tm => new { tm.TournamentId, tm.RoundNumber, tm.SlotIndex }).IsUnique();
+            entity.HasIndex(tm => tm.GameId);
+
+            entity.HasOne(tm => tm.Tournament)
+                .WithMany(t => t.Matches)
+                .HasForeignKey(tm => tm.TournamentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(tm => tm.Game)
+                .WithMany()
+                .HasForeignKey(tm => tm.GameId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
         
         // Game configuration

@@ -95,7 +95,8 @@ export const translations = {
       white: 'White',
       black: 'Black',
       chat: 'Chat',
-      sendMessage: 'Send message...'
+      sendMessage: 'Send message...',
+      backToTournament: 'Back to Tournament'
     },
     
     // Profile
@@ -309,7 +310,8 @@ export const translations = {
     // Spectator
     spectator: {
       watchingGame: 'Watching Game',
-      backToLiveGames: 'Back to Live Games'
+      backToLiveGames: 'Back to Live Games',
+      backToTournament: 'Back to Tournament'
     }
   },
   
@@ -410,7 +412,8 @@ export const translations = {
       white: 'Белые',
       black: 'Черные',
       chat: 'Чат',
-      sendMessage: 'Отправить сообщение...'
+      sendMessage: 'Отправить сообщение...',
+      backToTournament: 'Назад к турниру'
     },
     
     // Профиль
@@ -623,7 +626,8 @@ export const translations = {
     // Наблюдатель
     spectator: {
       watchingGame: 'Просмотр игры',
-      backToLiveGames: 'Назад к живым играм'
+      backToLiveGames: 'Назад к живым играм',
+      backToTournament: 'Назад к турниру'
     }
   }
 };

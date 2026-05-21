@@ -16,6 +16,7 @@ import '../styles/chessboard-responsive.css';
 export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const tournamentRoom = new URLSearchParams(window.location.search).get('t');
   const [showGameOverModal, setShowGameOverModal] = useState(false);
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
   const [showResignModal, setShowResignModal] = useState(false);
@@ -371,6 +372,12 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
 
   const handleBackToMenu = () => {
     navigate('/');
+  };
+
+  const handleBackToTournament = () => {
+    if (tournamentRoom) {
+      navigate(`/t/${tournamentRoom}/bracket`);
+    }
   };
 
   const getGameResultText = () => {
@@ -917,21 +924,42 @@ export default function ChessBoard({ gameId, userId, isPlayerWhite, onEloChange 
               flexDirection: 'column',
               gap: '12px'
             }}>
-              <button
-                onClick={handleFindNewGame}
-                style={{
-                  padding: '15px 30px',
-                  fontSize: '16px',
-                  background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold'
-                }}
-              >
-                🔍 {t('game.findNewGame')}
-              </button>
+              {/* Hide "Find new game" button in tournament games */}
+              {!tournamentRoom && (
+                <button
+                  onClick={handleFindNewGame}
+                  style={{
+                    padding: '15px 30px',
+                    fontSize: '16px',
+                    background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  🔍 {t('game.findNewGame')}
+                </button>
+              )}
+
+              {tournamentRoom && (
+                <button
+                  onClick={handleBackToTournament}
+                  style={{
+                    padding: '15px 30px',
+                    fontSize: '16px',
+                    background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(212, 175, 55, 0.12) 100%)',
+                    color: '#d4af37',
+                    border: '1px solid #d4af37',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  🏆 {t('game.backToTournament')}
+                </button>
+              )}
               
               <button
                 onClick={handleBackToMenu}

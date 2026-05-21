@@ -13,6 +13,10 @@ import Coach from './components/Coach';
 import Puzzles from './components/Puzzles';
 import LiveGames from './components/LiveGames';
 import SpectatorBoard from './components/SpectatorBoard';
+import Tournaments from './components/Tournaments';
+import TournamentArchive from './components/TournamentArchive';
+import TournamentLobby from './components/TournamentLobby';
+import TournamentBracket from './components/TournamentBracket';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import NotificationsPanel from './components/NotificationsPanel';
 import { useLanguage } from './i18n/LanguageContext';
@@ -237,6 +241,7 @@ function App() {
             {/* Desktop navigation */}
             <div className="nav-links nav-links-desktop">
               <Link to="/play" className="nav-link">{t('nav.play')}</Link>
+              <Link to="/tournaments" className="nav-link">Tournaments</Link>
               <Link to="/puzzles" className="nav-link">{t('nav.puzzles')}</Link>
               <Link to="/live" className="nav-link">{t('nav.liveGames')}</Link>
               <Link to="/history" className="nav-link">{t('nav.history')}</Link>
@@ -327,6 +332,9 @@ function App() {
               <Link to="/play" className="mobile-menu-link" onClick={() => setMobileMenuOpen(false)}>
                 ⚡ {t('nav.play')}
               </Link>
+              <Link to="/tournaments" className="mobile-menu-link" onClick={() => setMobileMenuOpen(false)}>
+                🏆 Tournaments
+              </Link>
               <Link to="/puzzles" className="mobile-menu-link" onClick={() => setMobileMenuOpen(false)}>
                 🧩 {t('nav.puzzles')}
               </Link>
@@ -397,6 +405,11 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/play" element={<PlayPage userId={user.id} />} />
+          <Route path="/tournaments" element={<Tournaments userId={user.id} />} />
+          <Route path="/tournaments/archive" element={<TournamentArchive />} />
+          <Route path="/tournaments/archive/:tournamentId" element={<TournamentArchive />} />
+          <Route path="/t/:roomName" element={<TournamentLobby userId={user.id} />} />
+          <Route path="/t/:roomName/bracket" element={<TournamentBracket userId={user.id} />} />
           <Route path="/puzzles" element={<Puzzles userId={user.id} />} />
           <Route path="/live" element={<LiveGames />} />
           <Route path="/watch/:gameId" element={<WatchGamePage />} />

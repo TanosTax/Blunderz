@@ -14,6 +14,7 @@ import '../styles/chessboard-responsive.css';
 export default function SpectatorBoard({ gameId }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const tournamentRoom = new URLSearchParams(window.location.search).get('t');
   const [gameData, setGameData] = useState(null);
   const [fen, setFen] = useState('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
   const [moveHistory, setMoveHistory] = useState([]);
@@ -108,8 +109,14 @@ export default function SpectatorBoard({ gameId }) {
     loadGame();
   }, [gameId]);
 
-  // Connect to SignalR as spectator
+  // Connect to SignalR as spectator (only for active games)
   useEffect(() => {
+    // Don't connect to SignalR for completed games
+    if (gameData && gameData.status !== 1) {
+      console.log('Spectator: Game is not active, skipping SignalR connection');
+      return;
+    }
+    
     const connectAsSpectator = async () => {
       try {
         await signalRService.connect();
@@ -159,9 +166,11 @@ export default function SpectatorBoard({ gameId }) {
     connectAsSpectator();
     
     return () => {
-      signalRService.leaveGameAsSpectator(gameId);
+      if (gameData && gameData.status === 1) {
+        signalRService.leaveGameAsSpectator(gameId);
+      }
     };
-  }, [gameId]);
+  }, [gameId, gameData]);
 
   // Timer logic
   useEffect(() => {
@@ -244,104 +253,30 @@ export default function SpectatorBoard({ gameId }) {
 
   return (
     <div className="chessboard-container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
-      {/* Game Over Modal */}
-      {gameOver && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.85)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
-            borderRadius: '12px',
-            padding: '40px',
-            maxWidth: '400px',
-            width: '90%',
-            textAlign: 'center',
-            boxShadow: '0 0 30px rgba(212, 175, 55, 0.3)',
-            border: '2px solid #d4af37'
-          }}>
-            <div style={{ fontSize: '64px', marginBottom: '20px' }}>
-              {gameResult === 'draw' ? '🤝' : '🏆'}
-            </div>
-            <h2 style={{ color: '#d4af37', marginBottom: '10px', fontSize: '28px' }}>
-              {gameResult === 'draw' ? t('game.draw') : t('game.gameOver')}
-            </h2>
-            
-            {winnerId && gameData && (
-              <div style={{ fontSize: '20px', color: '#4CAF50', marginBottom: '10px', fontWeight: 'bold' }}>
-                {winnerId === gameData.whitePlayerId 
-                  ? `⚪ ${gameData.whitePlayer?.username}` 
-                  : `⚫ ${gameData.blackPlayer?.username}`} {t('game.wins')}!
-              </div>
-            )}
-            
-            <p style={{ color: '#aaa', fontSize: '18px', marginBottom: '30px' }}>
-              {gameResult === 'checkmate' && t('game.checkmate')}
-              {gameResult === 'resignation' && t('game.resignation')}
-              {gameResult === 'timeout' && t('game.timeout')}
-              {gameResult === 'draw' && t('game.drawEnded')}
-            </p>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <button
-                onClick={() => navigate('/live')}
-                style={{
-                  padding: '15px 30px',
-                  fontSize: '16px',
-                  background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold'
-                }}
-              >
-                🔍 {t('spectator.backToLiveGames')}
-              </button>
-              
-              <button
-                onClick={() => window.location.reload()}
-                style={{
-                  padding: '12px 30px',
-                  fontSize: '14px',
-                  backgroundColor: 'transparent',
-                  color: '#888',
-                  border: '1px solid #444',
-                  borderRadius: '8px',
-                  cursor: 'pointer'
-                }}
-              >
-                {t('game.viewBoard')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="chessboard-header" style={{ marginBottom: '20px', textAlign: 'center' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h2 style={{ margin: 0, color: '#d4af37' }}>
             👁️ {t('spectator.watchingGame')}
           </h2>
           <button
-            onClick={() => navigate('/live')}
+            onClick={() => tournamentRoom ? navigate(`/t/${tournamentRoom}/bracket`) : navigate('/live')}
             className="btn-outline"
             style={{ padding: '8px 16px', fontSize: '14px' }}
           >
-            ← {t('spectator.backToLiveGames')}
+            ← {tournamentRoom ? t('spectator.backToTournament') : t('spectator.backToLiveGames')}
           </button>
         </div>
         
         <div style={{ fontSize: '16px', color: '#aaa' }}>
           {gameData.whitePlayer?.username} vs {gameData.blackPlayer?.username} • {gameData.timeControl}
+          {gameOver && (
+            <div style={{ marginTop: '8px', color: '#d4af37', fontWeight: 'bold' }}>
+              {gameResult === 'draw' ? '🤝 ' + t('game.draw') : 
+               winnerId && gameData ? 
+                 `🏆 ${winnerId === gameData.whitePlayerId ? gameData.whitePlayer?.username : gameData.blackPlayer?.username} ${t('game.wins')}` : 
+                 t('game.gameOver')}
+            </div>
+          )}
         </div>
       </div>
 

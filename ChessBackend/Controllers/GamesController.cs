@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.SignalR;
 using ChessBackend.Data;
 using ChessBackend.Models;
 using ChessBackend.Hubs;
+using ChessBackend.Services;
 
 namespace ChessBackend.Controllers;
 
@@ -14,12 +15,14 @@ public class GamesController : ControllerBase
     private readonly ChessDbContext _context;
     private readonly ILogger<GamesController> _logger;
     private readonly IHubContext<ChessHub> _hubContext;
+    private readonly TournamentService _tournamentService;
 
-    public GamesController(ChessDbContext context, ILogger<GamesController> logger, IHubContext<ChessHub> hubContext)
+    public GamesController(ChessDbContext context, ILogger<GamesController> logger, IHubContext<ChessHub> hubContext, TournamentService tournamentService)
     {
         _context = context;
         _logger = logger;
         _hubContext = hubContext;
+        _tournamentService = tournamentService;
     }
 
     [HttpGet("{id}")]
@@ -365,7 +368,7 @@ public class GamesController : ControllerBase
         });
 
         // Return game with Elo changes
-        return Ok(new
+        var response = new
         {
             game = game,
             eloChanges = new
@@ -379,7 +382,19 @@ public class GamesController : ControllerBase
                 blackNewElo = newBlackElo,
                 blackChange = blackEloChange
             }
-        });
+        };
+
+        // Tournament hook (best-effort)
+        try
+        {
+            await _tournamentService.OnGameEndedAsync(id, dto.WinnerId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to process tournament game end for game {GameId}", id);
+        }
+
+        return Ok(response);
     }
 }
 

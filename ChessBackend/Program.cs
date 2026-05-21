@@ -28,12 +28,15 @@ builder.Services.AddScoped<IMatchmakingService, MatchmakingService>();
 builder.Services.AddScoped<IPuzzleService, PuzzleService>();
 builder.Services.AddSingleton<IStockfishService, StockfishService>();
 builder.Services.AddScoped<AICoachService>();
+builder.Services.AddScoped<TournamentService>();
 builder.Services.AddHttpClient<AICoachService>()
     .ConfigureHttpClient(client =>
     {
         client.Timeout = TimeSpan.FromMinutes(5); // 5 minutes for AI analysis
     });
 builder.Services.AddHostedService<DisconnectTimeoutService>();
+builder.Services.AddHostedService<TournamentRoundSchedulerService>();
+builder.Services.AddHostedService<TournamentCleanupService>();
 
 // Configure CORS for Telegram Mini App
 builder.Services.AddCors(options =>
@@ -55,6 +58,13 @@ builder.Services.AddCors(options =>
 builder.Services.AddSignalR();
 
 var app = builder.Build();
+
+// Apply migrations automatically on startup (dev-friendly)
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ChessDbContext>();
+    db.Database.Migrate();
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
