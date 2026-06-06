@@ -1,3 +1,8 @@
+# Nix
+result
+result-*
+.direnv/
+
 # Backend
 ChessBackend/bin/
 ChessBackend/obj/

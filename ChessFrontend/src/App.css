@@ -103,8 +103,15 @@
   border-radius: 10px;
   border: 1px solid var(--color-border-gold);
   box-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
-  white-space: nowrap; /* Prevent text wrapping */
-  font-size: 14px; /* Make text slightly smaller */
+  white-space: nowrap;
+  font-size: 14px;
+  max-width: 200px;
+  min-width: 0;
+}
+
+.nav-user-info span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .nav-user-elo {
@@ -419,56 +426,12 @@ a:hover {
    RESPONSIVE DESIGN - MOBILE & TABLET
    ============================================ */
 
-/* Medium screens (1024px - 1280px) */
-@media (max-width: 1280px) and (min-width: 1025px) {
-  .nav-content {
-    gap: 12px;
-  }
-  
-  .nav-link {
-    padding: 8px 10px;
-    font-size: 13px;
-  }
-  
-  .nav-user-info {
-    padding: 8px 12px;
-    font-size: 13px;
-  }
-}
-
-/* Tablet (768px - 1024px) */
-@media (max-width: 1024px) {
-  .container {
-    padding: 20px;
-  }
-
-  .nav-content {
-    padding: 12px 16px;
-    gap: 12px; /* Reduced from 24px */
-  }
-  
-  .nav-link {
-    padding: 8px 10px; /* Even more compact for tablet */
-    font-size: 13px;
-  }
-  
-  .nav-user-info {
-    padding: 8px 12px;
-    font-size: 13px;
-  }
-
-  .card {
-    padding: 20px;
-  }
-}
-
-/* Mobile (max-width: 768px) */
-@media (max-width: 768px) {
-  /* Show burger menu, hide desktop nav */
+/* Tablet, laptop & medium desktop — full nav doesn't fit, use burger menu */
+@media (max-width: 1400px) {
   .app {
-    padding-top: 70px; /* Adjusted for mobile nav height */
+    padding-top: 70px;
   }
-  
+
   .burger-menu {
     display: flex;
   }
@@ -482,6 +445,25 @@ a:hover {
     display: block;
   }
 
+  .nav-content {
+    padding: 12px 16px;
+    gap: 12px;
+  }
+}
+
+/* Tablet (768px - 1400px) */
+@media (max-width: 1024px) {
+  .container {
+    padding: 20px;
+  }
+
+  .card {
+    padding: 20px;
+  }
+}
+
+/* Mobile (max-width: 768px) */
+@media (max-width: 768px) {
   .nav-content {
     padding: 12px 16px;
     gap: 12px;

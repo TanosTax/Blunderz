@@ -32,7 +32,9 @@ export default function LanguageSwitcher() {
       }}
       title={language === 'en' ? 'Switch to Russian' : 'Переключить на английский'}
     >
-      {language === 'en' ? '🇬🇧' : '🇷🇺'}
+      <span style={{ fontSize: '24px', lineHeight: '1' }}>
+        {language === 'en' ? '🇬🇧' : '🇷🇺'}
+      </span>
     </button>
   );
 }
