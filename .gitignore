@@ -26,6 +26,19 @@ pnpm-lock.yaml
 .env
 .env.local
 
+# Docker
+docker-compose.override.yml
+*.dockerignore
+
+# Secrets
+secrets/
+*.pem
+*.key
+
+# Backup files
+*.backup
+*.bak
+
 # IDE
 .vscode/
 .idea/

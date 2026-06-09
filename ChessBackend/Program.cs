@@ -14,9 +14,13 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Configure PostgreSQL
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+// Настройка PostgreSQL - работает и в Docker, и локально
+var connectionString = Environment.GetEnvironmentVariable("DefaultConnection")
+    ?? builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Host=localhost;Database=chessdb;Username=postgres;Password=postgres";
+
+// Для отладки (потом можно убрать)
+Console.WriteLine($"Using connection string: {connectionString.Replace("Password=", "Password=***")}");
 
 builder.Services.AddDbContext<ChessDbContext>(options =>
     options.UseNpgsql(connectionString));
@@ -32,22 +36,27 @@ builder.Services.AddScoped<TournamentService>();
 builder.Services.AddHttpClient<AICoachService>()
     .ConfigureHttpClient(client =>
     {
-        client.Timeout = TimeSpan.FromMinutes(5); // 5 minutes for AI analysis
+        client.Timeout = TimeSpan.FromMinutes(5);
     });
 builder.Services.AddHostedService<DisconnectTimeoutService>();
 builder.Services.AddHostedService<TournamentRoundSchedulerService>();
 builder.Services.AddHostedService<TournamentCleanupService>();
 
 // Configure CORS for Telegram Mini App
+// Configure CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("TelegramPolicy", policy =>
     {
         policy.WithOrigins(
-                "https://web.telegram.org", 
+                "https://web.telegram.org",
                 "https://*.telegram.org",
                 "http://localhost:5173",
-                "http://localhost:5174")
+                "http://localhost:5174",
+                "http://localhost",        // ДОБАВИТЬ ЭТО
+                "http://localhost:80",     // ДОБАВИТЬ ЭТО
+                "http://localhost:5000"    // ДОБАВИТЬ ЭТО ДЛЯ ТЕСТОВ
+              )
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -59,11 +68,11 @@ builder.Services.AddSignalR();
 
 var app = builder.Build();
 
-// Apply migrations automatically on startup (dev-friendly)
+// Apply migrations automatically on startup
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<ChessDbContext>();
-    db.Database.Migrate();
+    var dbContext = scope.ServiceProvider.GetRequiredService<ChessDbContext>();
+    await dbContext.Database.MigrateAsync();
 }
 
 // Configure the HTTP request pipeline.

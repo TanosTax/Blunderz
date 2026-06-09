@@ -241,7 +241,7 @@ function App() {
             {/* Desktop navigation */}
             <div className="nav-links nav-links-desktop">
               <Link to="/play" className="nav-link">{t('nav.play')}</Link>
-              <Link to="/tournaments" className="nav-link">Tournaments</Link>
+              <Link to="/tournaments" className="nav-link">{t('nav.tournaments')}</Link>
               <Link to="/puzzles" className="nav-link">{t('nav.puzzles')}</Link>
               <Link to="/live" className="nav-link">{t('nav.liveGames')}</Link>
               <Link to="/history" className="nav-link">{t('nav.history')}</Link>

@@ -23,7 +23,6 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<ActionResult<AuthResponse>> Register(RegisterDto dto)
     {
-        // Проверка существования пользователя
         if (await _context.Users.AnyAsync(u => u.Username == dto.Username))
         {
             return BadRequest(new { message = "Username already exists" });

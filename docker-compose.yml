@@ -1,36 +1,59 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: chess-postgres
+    container_name: blunderz_postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: chessdb
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: postgres123
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+    networks:
+      - blunderz_network
 
-  redis:
-    image: redis:7-alpine
-    container_name: chess-redis
+  backend:
+    build:
+      context: .
+      dockerfile: ChessBackend/Dockerfile
+    container_name: blunderz_backend
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:80
+      - DefaultConnection=Host=postgres;Port=5432;Database=chessdb;Username=postgres;Password=postgres123
+      - JWT_SECRET=super-secret-key-for-development-32chars
     ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - "5000:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - blunderz_network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ChessFrontend/Dockerfile
+    container_name: blunderz_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - blunderz_network
 
 volumes:
   postgres_data:
-  redis_data:
+
+networks:
+  blunderz_network:
+    driver: bridge

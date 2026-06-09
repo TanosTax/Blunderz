@@ -7,17 +7,17 @@ class SignalRService {
     this.joinedUserChannels = new Set(); // Track joined user channels
   }
 
-  async connect(backendUrl = 'http://localhost:5049') {
+  async connect(backendUrl = import.meta.env.VITE_SIGNALR_URL || 'http://localhost:5049') {
     if (this.connection && this.connection.state === 'Connected') {
       console.log('Already connected');
       return;
     }
 
     this.connection = new signalR.HubConnectionBuilder()
-      .withUrl(`${backendUrl}/hubs/chess`)
-      .withAutomaticReconnect()
-      .configureLogging(signalR.LogLevel.Information)
-      .build();
+        .withUrl(backendUrl)  // ← ИСПРАВЛЕНО (было `${backendUrl}/hubs/chess`)
+        .withAutomaticReconnect()
+        .configureLogging(signalR.LogLevel.Information)
+        .build();
 
     try {
       await this.connection.start();
@@ -45,10 +45,6 @@ class SignalRService {
 
     await this.connection.invoke('LeaveGame', this.gameId);
     this.gameId = null;
-  }
-
-  async registerConnection(gameId, playerId) {
-    // Removed - not needed
   }
 
   async claimVictory(gameId, winnerId) {
@@ -368,14 +364,6 @@ class SignalRService {
     }
 
     this.connection.on('ChallengeReceived', callback);
-  }
-
-  onChallengeSent(callback) {
-    if (!this.connection) {
-      return;
-    }
-
-    this.connection.on('ChallengeSent', callback);
   }
 
   onChallengeSent(callback) {

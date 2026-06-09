@@ -16,17 +16,28 @@ public class StockfishService : IStockfishService, IDisposable
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
 
-    public StockfishService(ILogger<StockfishService> logger, IServiceScopeFactory scopeFactory)
+    public StockfishService(
+        ILogger<StockfishService> logger,
+        IServiceScopeFactory scopeFactory,
+        IConfiguration configuration)
     {
         _logger = logger;
         _scopeFactory = scopeFactory;
+
+        var stockfishPath = configuration["Stockfish:Path"];
+        if (string.IsNullOrWhiteSpace(stockfishPath))
+        {
+            stockfishPath = "stockfish";
+        }
+
+        _logger.LogInformation("Starting Stockfish from: {StockfishPath}", stockfishPath);
 
         // Start Stockfish process
         _stockfishProcess = new Process
         {
             StartInfo = new ProcessStartInfo
             {
-                FileName = "stockfish",
+                FileName = stockfishPath,
                 UseShellExecute = false,
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,

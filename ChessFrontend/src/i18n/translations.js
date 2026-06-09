@@ -3,6 +3,7 @@ export const translations = {
     // Navigation
     nav: {
       play: 'Play',
+      tournaments: 'Tournaments',
       puzzles: 'Puzzles',
       liveGames: 'Live Games',
       leaderboard: 'Leaderboard',
@@ -54,7 +55,6 @@ export const translations = {
       checkmate: 'Checkmate!',
       stalemate: 'Stalemate',
       draw: 'Draw',
-      timeout: 'Time out',
       timeout: 'Time out',
       youWon: 'You Won!',
       youLost: 'You Lost',
@@ -270,7 +270,7 @@ export const translations = {
       askQuestion: 'Ask a question',
       chatPlaceholder: 'Ask me anything about chess...',
       send: 'Send',
-      analyzing: 'Analyzing...',
+      //analyzing: 'Analyzing...',
       noGames: 'No games to analyze yet. Play some games first!',
       welcome: 'Hello! I\'m your AI chess coach. Select a game to analyze or ask me any chess question.',
       gameSelected: 'Game selected. Analyzing...'
@@ -319,6 +319,7 @@ export const translations = {
     // Навигация
     nav: {
       play: 'Играть',
+      tournaments: 'Турниры',
       puzzles: 'Задачи',
       liveGames: 'Живые игры',
       leaderboard: 'Рейтинг',

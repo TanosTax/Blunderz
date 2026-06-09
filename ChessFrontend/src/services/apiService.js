@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5049/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 class ApiService {
   async createUser(telegramId, username) {
@@ -10,7 +10,6 @@ class ApiService {
 
     if (!response.ok) {
       if (response.status === 409) {
-        // User already exists, get by telegram ID
         return this.getUserByTelegramId(telegramId);
       }
       throw new Error('Failed to create user');
