@@ -30,13 +30,15 @@ services:
       - ASPNETCORE_URLS=http://+:80
       - DefaultConnection=Host=postgres;Port=5432;Database=chessdb;Username=postgres;Password=${POSTGRES_PASSWORD:-postgres123}
       - JWT_SECRET=${JWT_SECRET:-super-secret-key-for-development-32chars}
-      # Путь к Stockfish в контейнере
-      - Stockfish__Path=/usr/games/stockfish
+      - Stockfish__Path=/usr/local/bin/stockfish
+      - Ollama__Url=http://ollama:11434
     ports:
       - "5000:80"
     depends_on:
       postgres:
         condition: service_healthy
+      ollama:
+        condition: service_started
     networks:
       - blunderz_network
 
@@ -53,8 +55,22 @@ services:
     networks:
       - blunderz_network
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: blunderz_ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - blunderz_network
+    # Просто запускаем ollama serve (по умолчанию)
+    # Без дополнительных команд
+
 volumes:
   postgres_data:
+  ollama_data:
 
 networks:
   blunderz_network:
