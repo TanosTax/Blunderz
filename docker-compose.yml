@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: chessdb
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
     ports:
       - "5432:5432"
     volumes:
@@ -28,8 +28,10 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:80
-      - DefaultConnection=Host=postgres;Port=5432;Database=chessdb;Username=postgres;Password=postgres123
-      - JWT_SECRET=super-secret-key-for-development-32chars
+      - DefaultConnection=Host=postgres;Port=5432;Database=chessdb;Username=postgres;Password=${POSTGRES_PASSWORD:-postgres123}
+      - JWT_SECRET=${JWT_SECRET:-super-secret-key-for-development-32chars}
+      # Путь к Stockfish в контейнере
+      - Stockfish__Path=/usr/games/stockfish
     ports:
       - "5000:80"
     depends_on:

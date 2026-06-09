@@ -19,11 +19,10 @@ var connectionString = Environment.GetEnvironmentVariable("DefaultConnection")
     ?? builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Host=localhost;Database=chessdb;Username=postgres;Password=postgres";
 
-// Для отладки (потом можно убрать)
-Console.WriteLine($"Using connection string: {connectionString.Replace("Password=", "Password=***")}");
-
 builder.Services.AddDbContext<ChessDbContext>(options =>
     options.UseNpgsql(connectionString));
+
+
 
 // Register services
 builder.Services.AddScoped<IEloCalculatorService, EloCalculatorService>();
