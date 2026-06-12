@@ -1,0 +1,94 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: blunderz_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: chessdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - blunderz_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  backend:
+    build:
+      context: .
+      dockerfile: ChessBackend/Dockerfile
+    container_name: blunderz_backend
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:80
+      - DefaultConnection=Host=postgres;Port=5432;Database=chessdb;Username=postgres;Password=postgres123
+      - JWT_SECRET=${JWT_SECRET:-super-secret-key-for-development-32chars}
+      - Stockfish__Path=/usr/local/bin/stockfish
+      - Ollama__Url=http://ollama:11434
+    ports:
+      - "5000:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    networks:
+      - blunderz_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    build:
+      context: ./ChessFrontend
+      dockerfile: Dockerfile
+    container_name: blunderz_frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - backend
+    networks:
+      - blunderz_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: blunderz_ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - blunderz_network
+    # Просто запускаем ollama serve (по умолчанию)
+    # Без дополнительных команд
+
+volumes:
+  postgres_data:
+  ollama_data:
+
+networks:
+  blunderz_network:
+    driver: bridge

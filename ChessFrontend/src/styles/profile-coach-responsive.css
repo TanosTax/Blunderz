@@ -1,0 +1,282 @@
+/* Profile & Coach Responsive Styles */
+
+/* Profile Stats */
+.stat-card {
+  text-align: center;
+  padding: 16px;
+  background: rgba(212, 175, 55, 0.05);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  background: rgba(212, 175, 55, 0.1);
+  border-color: #d4af37;
+}
+
+.stat-label {
+  color: #888;
+  font-size: 13px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  color: #fff;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+/* Mobile Responsive - Profile */
+@media (max-width: 768px) {
+  /* Profile container */
+  .profile-container {
+    padding: 12px !important;
+  }
+
+  /* Stats grid - 2 columns on mobile */
+  .profile-stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  .stat-card {
+    padding: 12px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+  }
+
+  .stat-value {
+    font-size: 20px;
+  }
+
+  /* Friends section - stack vertically */
+  .profile-friends-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  /* Friend cards */
+  .friend-card {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+
+  .friend-card button {
+    width: 100%;
+  }
+}
+
+/* Mobile Responsive - Coach */
+@media (max-width: 768px) {
+  /* Coach main container */
+  .coach-container {
+    flex-direction: column !important;
+    height: auto !important;
+    min-height: calc(100vh - 100px);
+    padding: 12px !important;
+    gap: 12px !important;
+  }
+
+  /* Games sidebar - horizontal scroll on mobile */
+  .coach-sidebar {
+    width: 100% !important;
+    max-height: 250px !important;
+    padding: 16px !important;
+  }
+
+  .coach-sidebar h2 {
+    font-size: 18px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .coach-sidebar h3 {
+    font-size: 13px !important;
+    margin-bottom: 10px !important;
+  }
+
+  /* Games list - horizontal scroll */
+  .coach-games-list {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    gap: 10px !important;
+    padding-bottom: 10px;
+  }
+
+  .coach-game-card {
+    min-width: 250px !important;
+    padding: 12px !important;
+  }
+
+  /* Chat area */
+  .coach-chat {
+    flex: 1 !important;
+    min-height: 500px !important;
+  }
+
+  .coach-messages {
+    padding: 12px !important;
+    gap: 10px !important;
+  }
+
+  .coach-message {
+    max-width: 85% !important;
+    padding: 10px 12px !important;
+    font-size: 14px !important;
+  }
+
+  .coach-input-area {
+    padding: 12px !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  .coach-input-area input {
+    width: 100% !important;
+    padding: 10px 12px !important;
+    font-size: 14px !important;
+  }
+
+  .coach-input-area button {
+    width: 100% !important;
+    padding: 10px !important;
+  }
+}
+
+/* Mobile Responsive - Puzzles */
+@media (max-width: 768px) {
+  /* Puzzles container */
+  .puzzles-container {
+    padding: 12px !important;
+  }
+
+  /* Stats grid - 2 columns on mobile */
+  .puzzles-stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  /* Puzzles layout - stack vertically */
+  .puzzles-layout {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  /* Board container */
+  .puzzles-board-container {
+    order: 1;
+    padding: 12px !important;
+  }
+
+  .puzzles-board-wrapper {
+    max-width: 100% !important;
+  }
+
+  /* Info panel */
+  .puzzles-info-panel {
+    order: 2;
+  }
+
+  /* Buttons */
+  .puzzles-buttons {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .puzzles-buttons button {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  /* Message box */
+  .puzzles-message {
+    font-size: 14px !important;
+    padding: 10px !important;
+  }
+
+  /* Puzzle info */
+  .puzzles-info {
+    font-size: 13px !important;
+  }
+}
+
+/* Small Mobile */
+@media (max-width: 480px) {
+  .puzzles-container {
+    padding: 8px !important;
+  }
+
+  .puzzles-stats-grid {
+    gap: 8px !important;
+  }
+
+  .puzzles-board-container {
+    padding: 8px !important;
+  }
+
+  .puzzles-info h3 {
+    font-size: 16px !important;
+  }
+
+  .puzzles-info p {
+    font-size: 13px !important;
+  }
+}
+
+/* Small Mobile - Coach/Profile fixes */
+@media (max-width: 480px) {
+  /* Profile */
+  .stat-card {
+    padding: 10px;
+  }
+
+  .stat-label {
+    font-size: 10px;
+  }
+
+  .stat-value {
+    font-size: 18px;
+  }
+
+  /* Coach */
+  .coach-sidebar {
+    max-height: 200px !important;
+    padding: 12px !important;
+  }
+
+  .coach-game-card {
+    min-width: 220px !important;
+    padding: 10px !important;
+    font-size: 13px !important;
+  }
+
+  .coach-message {
+    max-width: 90% !important;
+    padding: 8px 10px !important;
+    font-size: 13px !important;
+  }
+}
+
+
+
+/* Live Games Mobile Responsive */
+@media (max-width: 768px) {
+  .live-games-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .live-game-card {
+    grid-template-columns: 1fr !important;
+    text-align: center !important;
+  }
+  
+  .live-game-card > div {
+    text-align: center !important;
+  }
+}

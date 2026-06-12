@@ -1,0 +1,125 @@
+/* Tournaments Page Responsive Styles */
+
+/* Desktop (default) - already styled inline */
+
+/* Tablet (768px - 1024px) */
+@media (max-width: 1024px) {
+  .tournaments-container {
+    max-width: 90% !important;
+    margin: 60px auto !important;
+  }
+
+  .tournament-create-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Mobile (< 768px) */
+@media (max-width: 768px) {
+  .tournaments-container {
+    max-width: 100% !important;
+    margin: 60px auto !important;
+    padding: 12px !important;
+  }
+
+  .tournaments-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 16px !important;
+  }
+
+  .tournaments-header > div {
+    width: 100%;
+  }
+
+  .tournaments-header button {
+    width: 100%;
+  }
+
+  .tournament-join-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .tournament-join-grid button {
+    width: 100%;
+  }
+
+  .tournament-card {
+    padding: 12px !important;
+  }
+
+  .tournament-card-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .tournament-card-info {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .tournament-create-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .tournament-create-actions {
+    margin-top: 12px !important;
+  }
+
+  .tournament-create-actions button {
+    width: 100%;
+    padding: 12px !important;
+  }
+
+  /* Active tournaments list */
+  .active-tournaments-grid {
+    gap: 12px !important;
+  }
+
+  .active-tournament-card {
+    padding: 12px !important;
+  }
+
+  .active-tournament-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  .active-tournament-status {
+    align-self: flex-start !important;
+  }
+
+  .active-tournament-info {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    font-size: 13px !important;
+  }
+}
+
+/* Small Mobile (< 480px) */
+@media (max-width: 480px) {
+  .tournaments-container {
+    padding: 8px !important;
+  }
+
+  .tournament-card {
+    padding: 10px !important;
+  }
+
+  .tournament-card h3,
+  .tournament-card h4 {
+    font-size: 16px !important;
+  }
+
+  .active-tournament-info {
+    font-size: 12px !important;
+  }
+
+  .active-tournament-info span {
+    white-space: nowrap;
+  }
+}

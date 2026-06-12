@@ -1,0 +1,109 @@
+/* Custom Chessboard Themes for Blunderz */
+
+/* Gold & Black Theme */
+.cg-wrap.theme-gold {
+  background: #1a1a1a;
+}
+
+.cg-wrap.theme-gold cg-board {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='50' height='50' fill='%23d4af37'/%3E%3Crect x='50' width='50' height='50' fill='%23000000'/%3E%3Crect y='50' width='50' height='50' fill='%23000000'/%3E%3Crect x='50' y='50' width='50' height='50' fill='%23d4af37'/%3E%3C/svg%3E");
+  background-size: 25% 25%;
+}
+
+.cg-wrap.theme-gold cg-board square.last-move {
+  background-color: rgba(212, 175, 55, 0.4) !important;
+}
+
+.cg-wrap.theme-gold cg-board square.selected {
+  background-color: rgba(212, 175, 55, 0.6) !important;
+}
+
+.cg-wrap.theme-gold cg-board square.move-dest {
+  background: radial-gradient(rgba(212, 175, 55, 0.5) 22%, transparent 0);
+}
+
+/* Classic Brown Theme */
+.cg-wrap.theme-brown cg-board {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='50' height='50' fill='%23f0d9b5'/%3E%3Crect x='50' width='50' height='50' fill='%23b58863'/%3E%3Crect y='50' width='50' height='50' fill='%23b58863'/%3E%3Crect x='50' y='50' width='50' height='50' fill='%23f0d9b5'/%3E%3C/svg%3E");
+  background-size: 25% 25%;
+}
+
+/* Blue Theme */
+.cg-wrap.theme-blue {
+  background: #1a1a2e;
+}
+
+.cg-wrap.theme-blue cg-board {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='50' height='50' fill='%23dee3e6'/%3E%3Crect x='50' width='50' height='50' fill='%238ca2ad'/%3E%3Crect y='50' width='50' height='50' fill='%238ca2ad'/%3E%3Crect x='50' y='50' width='50' height='50' fill='%23dee3e6'/%3E%3C/svg%3E");
+  background-size: 25% 25%;
+}
+
+.cg-wrap.theme-blue cg-board square.last-move {
+  background-color: rgba(140, 162, 173, 0.4) !important;
+}
+
+/* Green Theme */
+.cg-wrap.theme-green cg-board {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='50' height='50' fill='%23ffffdd'/%3E%3Crect x='50' width='50' height='50' fill='%2386a666'/%3E%3Crect y='50' width='50' height='50' fill='%2386a666'/%3E%3Crect x='50' y='50' width='50' height='50' fill='%23ffffdd'/%3E%3C/svg%3E");
+  background-size: 25% 25%;
+}
+
+.cg-wrap.theme-green cg-board square.last-move {
+  background-color: rgba(134, 166, 102, 0.4) !important;
+}
+
+/* Purple Theme */
+.cg-wrap.theme-purple cg-board {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='50' height='50' fill='%23e8e8e8'/%3E%3Crect x='50' width='50' height='50' fill='%239f7bb0'/%3E%3Crect y='50' width='50' height='50' fill='%239f7bb0'/%3E%3Crect x='50' y='50' width='50' height='50' fill='%23e8e8e8'/%3E%3C/svg%3E");
+  background-size: 25% 25%;
+}
+
+.cg-wrap.theme-purple cg-board square.last-move {
+  background-color: rgba(159, 123, 176, 0.4) !important;
+}
+
+/* Board Size Variants */
+.board-small {
+  max-width: 400px !important;
+}
+
+.board-medium {
+  max-width: 600px !important;
+}
+
+.board-large {
+  max-width: 800px !important;
+}
+
+/* Coordinates styling */
+.cg-wrap coords {
+  color: var(--color-text-gold);
+  font-weight: 600;
+  text-shadow: 0 0 5px rgba(212, 175, 55, 0.5);
+}
+
+/* Highlight check */
+.cg-wrap cg-board square.check {
+  background-color: rgba(255, 0, 0, 0.4) !important;
+}
+
+/* Smooth animations */
+.cg-wrap piece {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.cg-wrap piece:hover {
+  transform: scale(1.05);
+  filter: drop-shadow(0 4px 8px rgba(212, 175, 55, 0.4));
+}
+
+/* Board glow effect */
+.cg-wrap {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.theme-gold .cg-wrap {
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.3);
+}
